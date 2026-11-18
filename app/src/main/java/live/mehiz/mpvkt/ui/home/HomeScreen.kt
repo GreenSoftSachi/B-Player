@@ -153,15 +153,7 @@ object HomeScreen : Screen {
         val videos = withContext(Dispatchers.IO) { queryVideos(context) }
         allVideos = videos
 
-        // If at root and there is an obvious primary folder like "TV", auto-open it or stay at root
-        if (currentPath.isEmpty() && videos.isNotEmpty()) {
-          val topFolders = videos.mapNotNull { it.segments.firstOrNull() }.distinct()
-          if (topFolders.size == 1) {
-            currentPath = listOf(topFolders.first())
-          } else if (topFolders.contains("TV")) {
-            currentPath = listOf("TV")
-          }
-        }
+        // Always start at root Storage view (Internal Storage & SD Card)
         isLoading = false
       }
     }
@@ -236,7 +228,7 @@ object HomeScreen : Screen {
       if (!isFoldersMode) {
         "All Videos"
       } else if (currentPath.isEmpty()) {
-        "B-Player"
+        "Storage"
       } else {
         currentPath.joinToString(" / ")
       }
@@ -536,19 +528,30 @@ object HomeScreen : Screen {
     val parent = file.parentFile ?: return emptyList()
     val parentPath = parent.absolutePath.replace('\\', '/')
 
-    val cleanPath = when {
-      parentPath.startsWith("/storage/emulated/0") -> parentPath.removePrefix("/storage/emulated/0")
-      parentPath.startsWith("/sdcard") -> parentPath.removePrefix("/sdcard")
+    val (storageRoot, relPath) = when {
+      parentPath.startsWith("/storage/emulated/0") -> {
+        Pair("Internal Storage", parentPath.removePrefix("/storage/emulated/0").trim('/'))
+      }
+      parentPath.startsWith("/sdcard") -> {
+        Pair("Internal Storage", parentPath.removePrefix("/sdcard").trim('/'))
+      }
       parentPath.startsWith("/storage/") -> {
         val afterStorage = parentPath.removePrefix("/storage/")
         val slashIdx = afterStorage.indexOf('/')
-        if (slashIdx >= 0) afterStorage.substring(slashIdx) else ""
+        if (slashIdx >= 0) {
+          Pair("SD Card", afterStorage.substring(slashIdx).trim('/'))
+        } else {
+          Pair("SD Card", "")
+        }
       }
-      else -> parentPath
-    }.trim('/')
+      else -> Pair("Internal Storage", parentPath.trim('/'))
+    }
 
-    if (cleanPath.isEmpty()) return emptyList()
-    return cleanPath.split('/').filter { it.isNotBlank() }
+    val segments = mutableListOf(storageRoot)
+    if (relPath.isNotEmpty()) {
+      segments.addAll(relPath.split('/').filter { it.isNotBlank() })
+    }
+    return segments
   }
 }
 
@@ -564,6 +567,11 @@ fun FolderRowItem(
       .padding(horizontal = 20.dp, vertical = 12.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
+    val folderTint = when (folder.name) {
+      "Internal Storage" -> Color(0xFF00E5FF)
+      "SD Card" -> Color(0xFF00E676)
+      else -> Color(0xFFFFB74D)
+    }
     Box(
       contentAlignment = Alignment.TopEnd,
     ) {
@@ -571,7 +579,7 @@ fun FolderRowItem(
         Icons.Default.Folder,
         contentDescription = null,
         modifier = Modifier.size(38.dp),
-        tint = MaterialTheme.colorScheme.primary,
+        tint = folderTint,
       )
       if (folder.videoCount > 0) {
         Box(
@@ -642,6 +650,11 @@ fun CompactFolderGridCard(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.Center,
     ) {
+      val folderTint = when (folder.name) {
+        "Internal Storage" -> Color(0xFF00E5FF)
+        "SD Card" -> Color(0xFF00E676)
+        else -> Color(0xFFFFB74D)
+      }
       Box(
         contentAlignment = Alignment.TopEnd,
         modifier = Modifier.padding(bottom = 4.dp),
@@ -650,7 +663,7 @@ fun CompactFolderGridCard(
           Icons.Default.Folder,
           contentDescription = null,
           modifier = Modifier.size(34.dp),
-          tint = MaterialTheme.colorScheme.primary,
+          tint = folderTint,
         )
         if (folder.videoCount > 0) {
           Box(

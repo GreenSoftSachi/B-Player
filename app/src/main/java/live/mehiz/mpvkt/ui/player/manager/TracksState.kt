@@ -69,8 +69,11 @@ class TracksState(private val mpv: MPV, private val context: Context, json: Json
 
   fun addSubtitle(uri: Uri) {
     manuallyDisabled = false
-    val url = uri.toString()
-    val path = if (url.startsWith("content://")) uri.openContentFd(context) ?: url else url
+    val path = when (uri.scheme) {
+      "content" -> uri.openContentFd(context) ?: uri.toString()
+      "file" -> uri.path ?: uri.toString()
+      else -> uri.toString()
+    }
     mpv.command("sub-add", path, "select")
     mpv.prop("secondary-sid", false)
   }

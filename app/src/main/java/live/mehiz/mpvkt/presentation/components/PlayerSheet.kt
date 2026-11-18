@@ -149,7 +149,7 @@ fun PlayerSheet(
             .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         ),
       shape = MaterialTheme.shapes.extraLarge.copy(bottomEnd = ZeroCornerSize, bottomStart = ZeroCornerSize),
-      color = Color(0xF0121824),
+      color = Color(0xCC0D1420),
       tonalElevation = tonalElevation,
       content = {
         BackHandler(

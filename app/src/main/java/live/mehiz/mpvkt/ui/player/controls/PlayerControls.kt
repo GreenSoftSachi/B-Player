@@ -10,6 +10,8 @@ import android.provider.MediaStore
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import live.mehiz.mpvkt.ui.player.controls.components.SubtitleFileBrowserDialog
 import java.io.File
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -158,6 +160,28 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
       viewModel.sheetShown.update { Sheets.None }
     }
   }
+  val context = LocalContext.current
+  val sheetShown by viewModel.sheetShown.collectAsState()
+  val panelShown by viewModel.panelShown.collectAsState()
+  var isSubtitleBrowserOpen by remember { mutableStateOf(false) }
+  var wasPlayingBeforeMenu by remember { mutableStateOf(false) }
+
+  val isAnyMenuOpen = sheetShown != Sheets.None || panelShown != Panels.None || isSubtitleBrowserOpen
+
+  LaunchedEffect(isAnyMenuOpen) {
+    if (isAnyMenuOpen) {
+      if (!paused) {
+        wasPlayingBeforeMenu = true
+        playback.setPaused(true)
+      }
+    } else {
+      if (wasPlayingBeforeMenu) {
+        playback.setPaused(false)
+        wasPlayingBeforeMenu = false
+      }
+    }
+  }
+
   val customButton by viewModel.primaryButton.collectAsState()
   val subtitles by playerManager.tracks.subtitles.collectAsState()
   val folderPath by playback.parentFolderPath.collectAsState()
@@ -567,7 +591,7 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
             subtitles = subtitles,
             onSelectSubtitle = playerManager.tracks::selectSubtitle,
             onDisableSubtitles = playerManager.tracks::disableSubtitles,
-            onAddSubtitle = { subtitlesPicker.launch(arrayOf("*/*")) },
+            onAddSubtitle = { isSubtitleBrowserOpen = true },
             onSubtitlesLongClick = { onOpenPanel(Panels.SubtitleSettings) },
             onAudioClick = { onOpenSheet(Sheets.AudioTracks) },
             onAudioLongClick = { onOpenPanel(Panels.AudioDelay) },
@@ -664,6 +688,18 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
     }
     PlayerSheetsHost(viewModel, chapters, currentChapter, decoder, playbackSpeed, onOpenSheet, onOpenPanel)
     PlayerPanelsHost(viewModel, onOpenPanel)
+
+    if (isSubtitleBrowserOpen) {
+      val resolvedFolder = resolveParentFolder(context, currentVideoPath, folderPath)
+      SubtitleFileBrowserDialog(
+        initialDirectory = resolvedFolder,
+        onSelectSubtitleFile = { file ->
+          playerManager.tracks.addSubtitle(Uri.fromFile(file))
+          isSubtitleBrowserOpen = false
+        },
+        onDismissRequest = { isSubtitleBrowserOpen = false },
+      )
+    }
   }
 }
 

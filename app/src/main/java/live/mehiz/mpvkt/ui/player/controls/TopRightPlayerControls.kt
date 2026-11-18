@@ -69,7 +69,7 @@ fun TopRightPlayerControls(
       DropdownMenu(
         expanded = isDecoderMenuOpen,
         onDismissRequest = { isDecoderMenuOpen = false },
-        modifier = Modifier.background(Color(0xEE1E2430), RoundedCornerShape(12.dp)),
+        modifier = Modifier.background(Color(0xCC0D1420), RoundedCornerShape(12.dp)),
       ) {
         listOf(Decoder.Auto, Decoder.HWPlus, Decoder.HW, Decoder.SW).forEach { dec ->
           val isSelected = decoder == dec || (dec == Decoder.Auto && (decoder == Decoder.AutoCopy || decoder == Decoder.Auto))
@@ -113,7 +113,7 @@ fun TopRightPlayerControls(
       DropdownMenu(
         expanded = isSubtitlesMenuOpen,
         onDismissRequest = { isSubtitlesMenuOpen = false },
-        modifier = Modifier.background(Color(0xEE1E2430), RoundedCornerShape(12.dp)),
+        modifier = Modifier.background(Color(0xCC0D1420), RoundedCornerShape(12.dp)),
       ) {
         DropdownMenuItem(
           text = {
@@ -181,7 +181,7 @@ fun TopRightPlayerControls(
       DropdownMenu(
         expanded = isMoreMenuOpen,
         onDismissRequest = { isMoreMenuOpen = false },
-        modifier = Modifier.background(Color(0xEE1E2430), RoundedCornerShape(12.dp)),
+        modifier = Modifier.background(Color(0xCC0D1420), RoundedCornerShape(12.dp)),
       ) {
         DropdownMenuItem(
           text = { Text("🎨 Video Filters", color = Color.White) },
