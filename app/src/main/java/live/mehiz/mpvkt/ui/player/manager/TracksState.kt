@@ -33,9 +33,9 @@ class TracksState(private val mpv: MPV, private val context: Context, json: Json
     scope.launch {
       subtitles.collect { subs ->
         if (!manuallyDisabled && subs.isNotEmpty()) {
-          val sid = mpv.getPropertyInt("sid")
+          val sid = mpv.getPropertyInt("sid") ?: 0
           if (sid <= 0) {
-            val autoTrack = subs.firstOrNull { it.isDefault } ?: subs.firstOrNull { it.id > 0 } ?: subs.first()
+            val autoTrack = subs.firstOrNull { it.default == true } ?: subs.firstOrNull { it.id > 0 } ?: subs.first()
             mpv.prop("sid", autoTrack.id)
             mpv.prop("secondary-sid", false)
           }
@@ -51,7 +51,7 @@ class TracksState(private val mpv: MPV, private val context: Context, json: Json
   }
 
   fun selectSubtitle(id: Int) {
-    val sid = mpv.getPropertyInt("sid")
+    val sid = mpv.getPropertyInt("sid") ?: 0
     if (id == sid) {
       manuallyDisabled = true
       mpv.prop("sid", false)
