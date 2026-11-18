@@ -184,6 +184,7 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
 
   val customButton by viewModel.primaryButton.collectAsState()
   val subtitles by playerManager.tracks.subtitles.collectAsState()
+  val audioTracks by playerManager.tracks.audio.collectAsState()
   val folderPath by playback.parentFolderPath.collectAsState()
   val currentVideoPath by playback.currentPath.collectAsState()
   val subtitlesPicker = rememberLauncherForActivityResult(
@@ -593,7 +594,8 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
             onDisableSubtitles = playerManager.tracks::disableSubtitles,
             onAddSubtitle = { isSubtitleBrowserOpen = true },
             onSubtitlesLongClick = { onOpenPanel(Panels.SubtitleSettings) },
-            onAudioClick = { onOpenSheet(Sheets.AudioTracks) },
+            audioTracks = audioTracks,
+            onSelectAudio = { playerManager.tracks.toggleAudio(it) },
             onAudioLongClick = { onOpenPanel(Panels.AudioDelay) },
             onOpenVideoFilters = { onOpenPanel(Panels.VideoFilters) },
             onOpenPlaybackSpeed = { onOpenSheet(Sheets.PlaybackSpeed) },

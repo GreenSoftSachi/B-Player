@@ -36,31 +36,29 @@ jobs:
         run: |
           mkdir -p release-apks
           # Package the single best 64-bit APK for Android 10+ devices
-          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.2.0.apk
+          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.2.1.apk
           ls -la release-apks/
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: B-Player-v1.2.0-APK
+          name: B-Player-v1.2.1-APK
           path: release-apks/
           retention-days: 30
 
-      - name: Create GitHub Release v1.2.0
+      - name: Create GitHub Release v1.2.1
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.0
-          name: "B-Player v1.2.0 (MX-Style Subtitle Browser, Smart Auto-Resume, Frosted Glass & Dual Storage)"
+          tag_name: v1.2.1
+          name: "B-Player v1.2.1 (Frosted Glass Acrylic Dropdown Menus for SW, Subtitle, Audio & More)"
           body: |
-            ## 👑 B-Player v1.2.0 - Ultimate MX Player Experience Edition
+            ## 👑 B-Player v1.2.1 - Frosted Glass Menus Edition
             
-            ### 🌟 What's New in v1.2.0:
-            * 📂 **In-Player Subtitle File Browser (MX-Style)**: Tapping "Open Subtitle..." opens a sleek, frosted glass browser dialog right in the player center at the movie's directory. Tap outside to dismiss!
-            * ⏸️▶️ **Smart Settings Auto-Pause & Resume**: Opening any settings, sheet, or dialog pauses the video; exiting automatically resumes playback seamlessly!
-            * 🪟 **Frosted Translucent Windows**: All sheets, dialogs, and menus now use sleek semi-transparent frosted acrylic glass so the movie remains visible underneath.
-            * 📱💾 **Default Dual Storage View**: App launch always begins at root Storage, clearly showing Internal Storage (Cyan) and SD Card / Chip (Emerald) before navigating folders.
-            * 📦 **Single APK**: Exactly one clean ~81MB APK (`B-Player-v1.2.0.apk`)!
-          files: release-apks/B-Player-v1.2.0.apk
+            ### 🌟 What's New in v1.2.1:
+            * 🪟 **Frosted Translucent Dropdown Windows**: All 4 top-right popups (SW/HW Decoder, Subtitle, Audio, and More `...`) now feature modern frosted acrylic glass backgrounds (`#CC0D1420`), glowing cyan borders (`#3300E5FF`), and smooth 14dp rounded corners so video shines through!
+            * 🎵 **Direct Top Audio Dropdown Menu**: Audio icon now opens directly as a top popup dropdown just like SW and Subtitles, listing full audio language names with channel specs (e.g. Hindi 5.1, Tamil 5.1, English Stereo) plus quick Audio Delay.
+            * 🔒 **Zero Unwanted Changes**: Preserved all existing core player logic, subtitle auto-pick, and playback mechanisms intact.
+          files: release-apks/B-Player-v1.2.1.apk
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
