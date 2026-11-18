@@ -40,6 +40,8 @@ class PlaybackState(
   val speed: StateFlow<Float> = mpv.propFlow("speed", preferences.defaultSpeed.get())
   val readAhead: StateFlow<Float> = mpv.propFlow("demuxer-cache-duration", 0f)
   val mediaTitle: StateFlow<String> = mpv.propFlow("media-title", "")
+  val currentPath: StateFlow<String> = mpv.propFlow("path", "")
+  val parentFolderPath = MutableStateFlow<String?>(null)
   val chapter: StateFlow<Int> = mpv.propFlow("chapter", 0)
   val chapters: StateFlow<ImmutableList<Segment>> = mpv.propFlow<MPVNode>("chapter-list")
     .mapState(scope, { persistentListOf() }) { node ->

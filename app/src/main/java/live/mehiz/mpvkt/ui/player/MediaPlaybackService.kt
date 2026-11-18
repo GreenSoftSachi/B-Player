@@ -210,6 +210,14 @@ class MediaPlaybackService : MediaBrowserServiceCompat() {
     val path = getPlayableUri(intent) ?: return
     if (fileName.isNotBlank()) saveState()
     playIntent = intent
+    try {
+      val explicitFolder = intent.getStringExtra("folder_path") ?: run {
+        val explicitPath = intent.getStringExtra("video_path") ?: path
+        val real = if (explicitPath.startsWith("content://")) explicitPath.toUri().resolveUri(this) else explicitPath
+        if (!real.isNullOrBlank()) File(real).parent else null
+      }
+      playerManager.playback.parentFolderPath.value = explicitFolder
+    } catch (_: Exception) {}
     if (hasSurface) {
       mpv.command("loadfile", path)
       mpv.prop("pause", false)
@@ -366,8 +374,8 @@ class MediaPlaybackService : MediaBrowserServiceCompat() {
 
   private fun setupSubtitlesOptions() {
     mpv.setOptionString("slang", subtitlesPreferences.preferredLanguages.get())
-    mpv.setOptionString("sub-auto", "fuzzy")
-    mpv.setOptionString("sub-file-paths", "sub:subs:subtitles")
+    mpv.setOptionString("sub-auto", "all")
+    mpv.setOptionString("sub-file-paths", "sub:subs:subtitles:Sub:Subs:Subtitles")
 
     mpv.setOptionString("sub-fonts-dir", cacheDir.path + "/fonts/")
     mpv.setOptionString("sub-delay", (subtitlesPreferences.defaultSubDelay.get() / 1000.0).toString())

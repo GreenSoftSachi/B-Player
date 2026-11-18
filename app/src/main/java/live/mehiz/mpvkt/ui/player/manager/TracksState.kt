@@ -11,6 +11,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import live.mehiz.mpvkt.ui.player.TrackNode
 import live.mehiz.mpvkt.ui.player.mapState
@@ -18,6 +19,8 @@ import live.mehiz.mpvkt.ui.player.openContentFd
 import live.mehiz.mpvkt.ui.player.toObject
 
 class TracksState(private val mpv: MPV, private val context: Context, json: Json, scope: CoroutineScope) {
+  private var manuallyDisabled = false
+
   private val trackList: StateFlow<List<TrackNode>> = mpv.propFlow<MPVNode>("track-list")
     .mapState(scope, { emptyList() }) { it.toObject<List<TrackNode>>(json) }
 
@@ -26,11 +29,34 @@ class TracksState(private val mpv: MPV, private val context: Context, json: Json
   val audio: StateFlow<ImmutableList<TrackNode>> =
     trackList.mapState(scope, { persistentListOf() }) { list -> list.filter { it.isAudio }.toImmutableList() }
 
+  init {
+    scope.launch {
+      subtitles.collect { subs ->
+        if (!manuallyDisabled && subs.isNotEmpty()) {
+          val sid = mpv.getPropertyInt("sid")
+          if (sid <= 0) {
+            val autoTrack = subs.firstOrNull { it.isDefault } ?: subs.firstOrNull { it.id > 0 } ?: subs.first()
+            mpv.prop("sid", autoTrack.id)
+            mpv.prop("secondary-sid", false)
+          }
+        }
+      }
+    }
+  }
+
+  fun disableSubtitles() {
+    manuallyDisabled = true
+    mpv.prop("sid", false)
+    mpv.prop("secondary-sid", false)
+  }
+
   fun selectSubtitle(id: Int) {
     val sid = mpv.getPropertyInt("sid")
     if (id == sid) {
+      manuallyDisabled = true
       mpv.prop("sid", false)
     } else {
+      manuallyDisabled = false
       mpv.prop("sid", id)
     }
     // Always disable secondary-sid so subtitles are never duplicated at the top
@@ -42,9 +68,11 @@ class TracksState(private val mpv: MPV, private val context: Context, json: Json
   }
 
   fun addSubtitle(uri: Uri) {
+    manuallyDisabled = false
     val url = uri.toString()
     val path = if (url.startsWith("content://")) uri.openContentFd(context) ?: url else url
-    mpv.command("sub-add", path, "cached")
+    mpv.command("sub-add", path, "select")
+    mpv.prop("secondary-sid", false)
   }
 
   fun addAudio(uri: Uri) {

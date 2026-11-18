@@ -1,7 +1,14 @@
 package live.mehiz.mpvkt.ui.player.controls
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.DocumentsContract
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import java.io.File
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
@@ -150,6 +157,34 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
     }
   }
   val customButton by viewModel.primaryButton.collectAsState()
+  val subtitles by playerManager.tracks.subtitles.collectAsState()
+  val folderPath by playback.parentFolderPath.collectAsState()
+  val subtitlesPicker = rememberLauncherForActivityResult(
+    object : ActivityResultContracts.OpenDocument() {
+      override fun createIntent(context: Context, input: Array<String>): Intent {
+        val intent = super.createIntent(context, input)
+        try {
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val targetDir = if (!folderPath.isNullOrBlank()) {
+              File(folderPath!!)
+            } else {
+              val rootDir = android.os.Environment.getExternalStorageDirectory()
+              val moviesDir = File(rootDir, "Movies")
+              if (moviesDir.exists()) moviesDir else rootDir
+            }
+            if (targetDir != null && targetDir.exists()) {
+              intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.fromFile(targetDir))
+            }
+          }
+        } catch (_: Exception) {}
+        return intent
+      }
+    },
+  ) { uri ->
+    if (uri != null) {
+      playerManager.tracks.addSubtitle(uri)
+    }
+  }
 
   LaunchedEffect(
     controlsShown,
@@ -531,7 +566,10 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
             onSelectDecoder = { playerManager.video.setDecoder(it) },
             isChaptersVisible = showChaptersButton && chapters.isNotEmpty(),
             onChaptersClick = { onOpenSheet(Sheets.Chapters) },
-            onSubtitlesClick = { onOpenSheet(Sheets.SubtitleTracks) },
+            subtitles = subtitles,
+            onSelectSubtitle = playerManager.tracks::selectSubtitle,
+            onDisableSubtitles = playerManager.tracks::disableSubtitles,
+            onAddSubtitle = { subtitlesPicker.launch(arrayOf("*/*")) },
             onSubtitlesLongClick = { onOpenPanel(Panels.SubtitleSettings) },
             onAudioClick = { onOpenSheet(Sheets.AudioTracks) },
             onAudioLongClick = { onOpenPanel(Panels.AudioDelay) },

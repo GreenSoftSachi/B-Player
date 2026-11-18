@@ -387,6 +387,11 @@ object HomeScreen : Screen {
     }
     val intent = Intent(Intent.ACTION_VIEW, uri).apply {
       setClass(context, PlayerActivity::class.java)
+      putExtra("video_path", filepath)
+      try {
+        val parent = File(filepath).parent
+        if (parent != null) putExtra("folder_path", parent)
+      } catch (_: Exception) {}
     }
     context.startActivity(intent)
   }
@@ -394,6 +399,7 @@ object HomeScreen : Screen {
   fun playFile(uri: Uri, context: Context) {
     val intent = Intent(Intent.ACTION_VIEW, uri).apply {
       setClass(context, PlayerActivity::class.java)
+      putExtra("video_path", uri.toString())
     }
     context.startActivity(intent)
   }
@@ -402,6 +408,11 @@ object HomeScreen : Screen {
     val intent = Intent(Intent.ACTION_VIEW, video.uri).apply {
       setClass(context, PlayerActivity::class.java)
       putExtra("title", video.title)
+      putExtra("video_path", video.path)
+      try {
+        val parent = File(video.path).parent
+        if (parent != null) putExtra("folder_path", parent)
+      } catch (_: Exception) {}
 
       // Auto-load external subtitles in folder
       try {
