@@ -11,6 +11,7 @@ import android.provider.MediaStore
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.net.toUri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -337,6 +338,20 @@ object HomeScreen : Screen {
         }
       }
     }
+  }
+
+  fun playFile(filepath: String, context: Context) {
+    val intent = Intent(Intent.ACTION_VIEW, filepath.toUri()).apply {
+      setClass(context, PlayerActivity::class.java)
+    }
+    context.startActivity(intent)
+  }
+
+  fun playFile(uri: Uri, context: Context) {
+    val intent = Intent(context, PlayerActivity::class.java).apply {
+      data = uri
+    }
+    context.startActivity(intent)
   }
 
   private fun playVideo(context: Context, video: VideoItem) {
