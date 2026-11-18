@@ -35,7 +35,7 @@ class VideoSettings(
   init {
     scope.launch {
       mpv.propFlow<String>("hwdec-current").collectLatest { current ->
-        if (current.isNotBlank() && current != "no") {
+        if (!current.isNullOrBlank() && current != "no") {
           _decoder.value = Decoder.getDecoderFromValue(current)
         }
       }
