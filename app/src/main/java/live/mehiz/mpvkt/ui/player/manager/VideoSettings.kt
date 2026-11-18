@@ -101,13 +101,23 @@ class VideoSettings(
     playerPreferences.videoAspect.set(aspect)
   }
 
+  private var lastZoomTime = 0L
   fun zoomBy(zoomFactor: Float) {
+    val now = System.currentTimeMillis()
+    if (now - lastZoomTime < 40L) return
+    lastZoomTime = now
     val currentZoom = mpv.getPropertyDouble("video-zoom") ?: 0.0
-    val newZoom = (currentZoom + (zoomFactor - 1.0) * 1.5).coerceIn(0.0, 3.0)
+    val delta = (zoomFactor - 1.0) * 1.2
+    if (kotlin.math.abs(delta) < 0.005) return
+    val newZoom = (currentZoom + delta).coerceIn(0.0, 3.0)
     mpv.setPropertyDouble("video-zoom", newZoom)
   }
 
+  private var lastPanTime = 0L
   fun panBy(dx: Float, dy: Float) {
+    val now = System.currentTimeMillis()
+    if (now - lastPanTime < 40L) return
+    lastPanTime = now
     val currentPanX = mpv.getPropertyDouble("video-pan-x") ?: 0.0
     val currentPanY = mpv.getPropertyDouble("video-pan-y") ?: 0.0
     mpv.setPropertyDouble("video-pan-x", currentPanX + dx * 0.001)

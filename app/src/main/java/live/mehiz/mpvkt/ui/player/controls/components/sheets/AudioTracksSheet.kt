@@ -11,10 +11,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -70,9 +72,14 @@ fun AudioTrackRow(title: String, isSelected: Boolean, onClick: () -> Unit, modif
     RadioButton(
       isSelected,
       onClick,
+      colors = RadioButtonDefaults.colors(
+        selectedColor = Color(0xFF00E5FF),
+        unselectedColor = Color(0xFF8A99AD),
+      ),
     )
     Text(
       title,
+      color = if (isSelected) Color(0xFF00E5FF) else Color.White,
       fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal,
       fontStyle = if (isSelected) FontStyle.Italic else FontStyle.Normal,
     )

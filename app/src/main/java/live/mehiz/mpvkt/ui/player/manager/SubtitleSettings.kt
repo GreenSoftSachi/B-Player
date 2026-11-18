@@ -44,6 +44,25 @@ class SubtitleSettings(private val mpv: MPV, private val preferences: SubtitlesP
     .mapState(scope, preferences.defaultSecondarySubDelay::get) { (it * 1000).roundToInt() }
   val speed: StateFlow<Double> = mpv.propFlow("sub-speed", preferences.defaultSubSpeed.get().toDouble())
 
+  init {
+    try {
+      mpv.prop("sub-font", preferences.font.get())
+      mpv.prop("sub-font-size", preferences.fontSize.get())
+      mpv.prop("sub-bold", preferences.bold.get())
+      mpv.prop("sub-italic", preferences.italic.get())
+      mpv.prop("sub-border-size", preferences.borderSize.get())
+      mpv.prop("sub-border-style", preferences.borderStyle.get().value)
+      mpv.prop("sub-shadow-offset", preferences.shadowOffset.get())
+      mpv.prop("sub-scale", preferences.subScale.get())
+      mpv.prop("sub-pos", preferences.subPos.get())
+      mpv.prop("sub-justify", preferences.justification.get().value)
+      mpv.prop("sub-ass-override", if (preferences.overrideAssSubs.get()) "force" else "scale")
+      SubColorType.entries.forEach { type ->
+        mpv.prop(type.property, type.preference(preferences).get().toColorHexString())
+      }
+    } catch (_: Exception) {}
+  }
+
   fun setBold(value: Boolean) {
     mpv.prop("sub-bold", value)
     preferences.bold.set(value)

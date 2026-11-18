@@ -2,11 +2,15 @@ package live.mehiz.mpvkt.ui.player.controls
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
+import kotlin.math.abs
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -278,21 +282,31 @@ fun GestureHandler(
       }
       .pointerInput(areControlsLocked) {
         if (areControlsLocked) return@pointerInput
-        detectTransformGestures { centroid, pan, zoom, _ ->
-          if (zoom != 1f || pan != Offset.Zero) {
-            if (centroid.y > size.height * 0.7f) {
-              // Pinch on bottom third: Resize Subtitles!
-              val currentScale = viewModel.playerManager.subtitles.scale.value
-              val newScale = (currentScale * zoom).coerceIn(0.5f, 2.5f)
-              viewModel.playerManager.subtitles.setScale(newScale)
-              viewModel.playerUpdate.update { PlayerUpdates.ShowText("Subtitle Size: ${(newScale * 100).toInt()}%") }
-            } else {
-              // Pinch / Pan on main video: Zoom & Move Video!
-              if (zoom != 1f) {
-                viewModel.playerManager.video.zoomBy(zoom)
-              }
-              if (pan != Offset.Zero) {
-                viewModel.playerManager.video.panBy(pan.x, pan.y)
+        awaitPointerEventScope {
+          while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val downPointers = event.changes.filter { it.pressed }
+            if (downPointers.size >= 2) {
+              val zoom = event.calculateZoom()
+              val pan = event.calculatePan()
+              val centroid = event.calculateCentroid()
+              if (abs(zoom - 1f) > 0.015f || pan.getDistance() > 3f) {
+                downPointers.forEach { it.consume() }
+                if (centroid.y > size.height * 0.7f) {
+                  // Pinch on bottom third: Resize Subtitles!
+                  val currentScale = viewModel.playerManager.subtitles.scale.value
+                  val newScale = (currentScale * zoom).coerceIn(0.5f, 2.5f)
+                  viewModel.playerManager.subtitles.setScale(newScale)
+                  viewModel.playerUpdate.update { PlayerUpdates.ShowText("Subtitle Size: ${(newScale * 100).toInt()}%") }
+                } else {
+                  // Pinch / Pan on main video: Zoom & Move Video!
+                  if (abs(zoom - 1f) > 0.01f) {
+                    viewModel.playerManager.video.zoomBy(zoom)
+                  }
+                  if (pan != Offset.Zero) {
+                    viewModel.playerManager.video.panBy(pan.x, pan.y)
+                  }
+                }
               }
             }
           }

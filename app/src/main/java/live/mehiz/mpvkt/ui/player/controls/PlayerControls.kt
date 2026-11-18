@@ -21,13 +21,19 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
@@ -365,19 +371,64 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
               )
             }
 
-            controlsShown && !areControlsLocked -> Image(
-              painter = rememberAnimatedVectorPainter(icon, !paused),
-              modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-                .clickable(
-                  interaction,
-                  ripple(),
-                  onClick = viewModel::pauseUnpause,
+            controlsShown && !areControlsLocked -> Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(32.dp),
+            ) {
+              IconButton(
+                onClick = {
+                  val chapters = playerManager.playback.chapters.value
+                  val currentChapter = playerManager.playback.chapter.value
+                  if (chapters.isNotEmpty() && currentChapter > 0) {
+                    playerManager.playback.seekToChapter(currentChapter - 1)
+                  } else {
+                    playerManager.playback.seekBy(-10)
+                  }
+                },
+                modifier = Modifier.size(56.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Default.SkipPrevious,
+                  contentDescription = "Previous",
+                  tint = Color.White,
+                  modifier = Modifier.size(44.dp),
                 )
-                .padding(MaterialTheme.spacing.medium),
-              contentDescription = null,
-            )
+              }
+
+              Image(
+                painter = rememberAnimatedVectorPainter(icon, !paused),
+                modifier = Modifier
+                  .size(96.dp)
+                  .clip(CircleShape)
+                  .clickable(
+                    interaction,
+                    ripple(),
+                    onClick = viewModel::pauseUnpause,
+                  )
+                  .padding(MaterialTheme.spacing.medium),
+                contentDescription = null,
+              )
+
+              IconButton(
+                onClick = {
+                  val chapters = playerManager.playback.chapters.value
+                  val currentChapter = playerManager.playback.chapter.value
+                  if (chapters.isNotEmpty() && currentChapter < chapters.size - 1) {
+                    playerManager.playback.seekToChapter(currentChapter + 1)
+                  } else {
+                    playerManager.playback.seekBy(10)
+                  }
+                },
+                modifier = Modifier.size(56.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Default.SkipNext,
+                  contentDescription = "Next",
+                  tint = Color.White,
+                  modifier = Modifier.size(44.dp),
+                )
+              }
+            }
           }
         }
         AnimatedVisibility(
@@ -466,16 +517,18 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
           val showChaptersButton by playerPreferences.showChaptersButton.collectAsState()
           TopRightPlayerControls(
             decoder = decoder,
-            onDecoderClick = { onOpenSheet(Sheets.Decoders) },
-            onDecoderLongClick = { onOpenSheet(Sheets.Decoders) },
+            onSelectDecoder = { playerManager.video.setDecoder(it) },
             isChaptersVisible = showChaptersButton && chapters.isNotEmpty(),
             onChaptersClick = { onOpenSheet(Sheets.Chapters) },
             onSubtitlesClick = { onOpenSheet(Sheets.SubtitleTracks) },
             onSubtitlesLongClick = { onOpenPanel(Panels.SubtitleSettings) },
             onAudioClick = { onOpenSheet(Sheets.AudioTracks) },
             onAudioLongClick = { onOpenPanel(Panels.AudioDelay) },
-            onMoreClick = { onOpenSheet(Sheets.More) },
-            onMoreLongClick = { onOpenPanel(Panels.VideoFilters) },
+            onOpenVideoFilters = { onOpenPanel(Panels.VideoFilters) },
+            onOpenPlaybackSpeed = { onOpenSheet(Sheets.PlaybackSpeed) },
+            onOpenAudioDelay = { onOpenPanel(Panels.AudioDelay) },
+            onOpenSubtitleSettings = { onOpenPanel(Panels.SubtitleSettings) },
+            onOpenMoreSheet = { onOpenSheet(Sheets.More) },
           )
         }
         // Bottom right controls
