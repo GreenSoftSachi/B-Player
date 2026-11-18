@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -159,21 +161,17 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
   val customButton by viewModel.primaryButton.collectAsState()
   val subtitles by playerManager.tracks.subtitles.collectAsState()
   val folderPath by playback.parentFolderPath.collectAsState()
+  val currentVideoPath by playback.currentPath.collectAsState()
   val subtitlesPicker = rememberLauncherForActivityResult(
     object : ActivityResultContracts.OpenDocument() {
       override fun createIntent(context: Context, input: Array<String>): Intent {
         val intent = super.createIntent(context, input)
         try {
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val targetDir = if (!folderPath.isNullOrBlank()) {
-              File(folderPath!!)
-            } else {
-              val rootDir = android.os.Environment.getExternalStorageDirectory()
-              val moviesDir = File(rootDir, "Movies")
-              if (moviesDir.exists()) moviesDir else rootDir
-            }
-            if (targetDir != null && targetDir.exists()) {
-              intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.fromFile(targetDir))
+            val resolvedFolder = resolveParentFolder(context, currentVideoPath, folderPath)
+            val docUri = getFolderDocumentUri(resolvedFolder)
+            if (docUri != null) {
+              intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, docUri)
             }
           }
         } catch (_: Exception) {}
@@ -812,3 +810,57 @@ fun <T> playerControlsEnterAnimationSpec(): FiniteAnimationSpec<T> = tween(
   durationMillis = 100,
   easing = LinearOutSlowInEasing,
 )
+
+private fun getFolderDocumentUri(folderPath: String?): Uri? {
+  if (folderPath.isNullOrBlank()) return null
+  val cleanPath = folderPath.trimEnd('/', '\\')
+
+  val primaryStorage = Environment.getExternalStorageDirectory().absolutePath
+  val relPath = when {
+    cleanPath.startsWith(primaryStorage) -> cleanPath.removePrefix(primaryStorage).trimStart('/', '\\')
+    cleanPath.startsWith("/storage/emulated/0") -> cleanPath.removePrefix("/storage/emulated/0").trimStart('/', '\\')
+    cleanPath.startsWith("/sdcard") -> cleanPath.removePrefix("/sdcard").trimStart('/', '\\')
+    cleanPath.startsWith("/storage/") -> {
+      val afterStorage = cleanPath.removePrefix("/storage/")
+      val slashIdx = afterStorage.indexOfAny(charArrayOf('/', '\\'))
+      if (slashIdx != -1) {
+        val sdId = afterStorage.substring(0, slashIdx)
+        val sub = afterStorage.substring(slashIdx + 1)
+        return DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "$sdId:$sub")
+      } else {
+        return DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "$afterStorage:")
+      }
+    }
+    else -> cleanPath.trimStart('/', '\\')
+  }
+
+  val docId = if (relPath.isEmpty()) "primary:" else "primary:$relPath"
+  return DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", docId)
+}
+
+private fun resolveParentFolder(context: Context, currentPath: String?, folderPath: String?): String? {
+  if (!folderPath.isNullOrBlank()) return folderPath
+  if (currentPath.isNullOrBlank()) return null
+  try {
+    if (currentPath.startsWith("content://")) {
+      val uri = Uri.parse(currentPath)
+      val projection = arrayOf(MediaStore.Video.Media.DATA)
+      context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) {
+          val dataIdx = cursor.getColumnIndex(MediaStore.Video.Media.DATA)
+          if (dataIdx != -1) {
+            val d = cursor.getString(dataIdx)
+            if (!d.isNullOrBlank()) {
+              val p = File(d).parent
+              if (!p.isNullOrBlank()) return p
+            }
+          }
+        }
+      }
+    } else {
+      val file = File(currentPath)
+      return file.parent
+    }
+  } catch (_: Exception) {}
+  return null
+}

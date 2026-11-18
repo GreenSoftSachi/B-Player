@@ -36,31 +36,29 @@ jobs:
         run: |
           mkdir -p release-apks
           # Package the single best 64-bit APK for Android 10+ devices
-          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.1.8.apk
+          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.1.9.apk
           ls -la release-apks/
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: B-Player-v1.1.8-APK
+          name: B-Player-v1.1.9-APK
           path: release-apks/
           retention-days: 30
 
-      - name: Create GitHub Release v1.1.8
+      - name: Create GitHub Release v1.1.9
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.8
-          name: "B-Player v1.1.8 (HW-Style Subtitle Dropdown & Direct Movie Folder Picker)"
+          tag_name: v1.1.9
+          name: "B-Player v1.1.9 (Full Subtitle Language Names & Document Provider Direct Folder Navigation)"
           body: |
-            ## 👑 B-Player v1.1.8 - Precision Subtitle Dropdown Edition
+            ## 👑 B-Player v1.1.9 - Precision Language Names & Direct Folder Navigation Edition
             
-            ### 🌟 What's New in v1.1.8:
-            * 💬 **HW-Style Subtitle Dropdown**: Subtitle icon now opens a sleek, compact dropdown popup anchored directly underneath the top bar icon, just like the HW decoder menu!
-            * ⚡ **Auto-Select Movie Subtitles**: Embedded and folder subtitles are now automatically loaded and selected when the video starts playing.
-            * 📁 **Direct Movie Folder Navigation**: "Open Subtitle..." now launches the file picker directly inside the playing movie's directory for instant 1-click subtitle selection.
-            * 🚫 **Dedicated Off (None) Option**: Easily toggle subtitles off with a single tap in the dropdown.
-            * 📦 **Single APK**: Exactly one clean ~81MB APK (`B-Player-v1.1.8.apk`)!
-          files: release-apks/B-Player-v1.1.8.apk
+            ### 🌟 What's New in v1.1.9:
+            * 🗣️ **Complete Full Language Names**: Subtitle languages are now displayed as complete names like "Hindi", "Tamil", "English", "Sinhala", etc. instead of cryptic 2-letter codes!
+            * 📁 **True Direct Folder Navigation**: "Open Subtitle..." now builds an official Android External Storage Document URI (`content://com.android.externalstorage.documents/...`), opening Android DocumentsUI directly into the exact directory of the playing video.
+            * 📦 **Single APK**: Exactly one clean ~81MB APK (`B-Player-v1.1.9.apk`)!
+          files: release-apks/B-Player-v1.1.9.apk
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

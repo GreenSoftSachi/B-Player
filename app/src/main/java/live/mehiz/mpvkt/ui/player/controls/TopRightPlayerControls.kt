@@ -223,16 +223,156 @@ fun TopRightPlayerControls(
   }
 }
 
+private val LANGUAGE_MAP = mapOf(
+  // South Asian Languages
+  "hi" to "Hindi",
+  "hin" to "Hindi",
+  "ta" to "Tamil",
+  "tam" to "Tamil",
+  "ti" to "Tamil", // user-reported typo/tag for Tamil
+  "te" to "Telugu",
+  "tel" to "Telugu",
+  "ml" to "Malayalam",
+  "mal" to "Malayalam",
+  "kn" to "Kannada",
+  "kan" to "Kannada",
+  "si" to "Sinhala",
+  "sin" to "Sinhala",
+  "bn" to "Bengali",
+  "ben" to "Bengali",
+  "mr" to "Marathi",
+  "mar" to "Marathi",
+  "gu" to "Gujarati",
+  "guj" to "Gujarati",
+  "pa" to "Punjabi",
+  "pan" to "Punjabi",
+  "ur" to "Urdu",
+  "urd" to "Urdu",
+
+  // Common World Languages
+  "en" to "English",
+  "eng" to "English",
+  "es" to "Spanish",
+  "spa" to "Spanish",
+  "fr" to "French",
+  "fre" to "French",
+  "fra" to "French",
+  "de" to "German",
+  "ger" to "German",
+  "deu" to "German",
+  "it" to "Italian",
+  "ita" to "Italian",
+  "pt" to "Portuguese",
+  "por" to "Portuguese",
+  "ru" to "Russian",
+  "rus" to "Russian",
+  "ja" to "Japanese",
+  "jpn" to "Japanese",
+  "ko" to "Korean",
+  "kor" to "Korean",
+  "zh" to "Chinese",
+  "chi" to "Chinese",
+  "zho" to "Chinese",
+  "ar" to "Arabic",
+  "ara" to "Arabic",
+  "tr" to "Turkish",
+  "tur" to "Turkish",
+  "th" to "Thai",
+  "tha" to "Thai",
+  "vi" to "Vietnamese",
+  "vie" to "Vietnamese",
+  "id" to "Indonesian",
+  "ind" to "Indonesian",
+  "ms" to "Malay",
+  "may" to "Malay",
+  "msa" to "Malay",
+  "fa" to "Persian",
+  "per" to "Persian",
+  "fas" to "Persian",
+  "el" to "Greek",
+  "ell" to "Greek",
+  "gre" to "Greek",
+  "nl" to "Dutch",
+  "dut" to "Dutch",
+  "nld" to "Dutch",
+  "pl" to "Polish",
+  "pol" to "Polish",
+  "sv" to "Swedish",
+  "swe" to "Swedish",
+  "no" to "Norwegian",
+  "nor" to "Norwegian",
+  "da" to "Danish",
+  "dan" to "Danish",
+  "fi" to "Finnish",
+  "fin" to "Finnish",
+  "cs" to "Czech",
+  "ces" to "Czech",
+  "cze" to "Czech",
+  "hu" to "Hungarian",
+  "hun" to "Hungarian",
+  "ro" to "Romanian",
+  "ron" to "Romanian",
+  "rum" to "Romanian",
+  "uk" to "Ukrainian",
+  "ukr" to "Ukrainian",
+  "he" to "Hebrew",
+  "heb" to "Hebrew",
+)
+
+private fun resolveLanguageName(codeOrName: String?): String? {
+  if (codeOrName.isNullOrBlank()) return null
+  val raw = codeOrName.trim()
+  val key = raw.lowercase(Locale.ROOT)
+
+  // Direct lookup
+  LANGUAGE_MAP[key]?.let { return it }
+
+  // Check prefix before dash/underscore (e.g. en-US -> en)
+  val baseKey = key.substringBefore("-").substringBefore("_")
+  LANGUAGE_MAP[baseKey]?.let { return it }
+
+  // Check Java Locale
+  try {
+    val loc = Locale.forLanguageTag(raw)
+    val display = loc.getDisplayLanguage(Locale.ENGLISH)
+    if (display.isNotBlank() && !display.equals(raw, true) && display.length > raw.length) {
+      return display
+    }
+  } catch (_: Exception) {}
+
+  try {
+    val loc2 = Locale(baseKey)
+    val display2 = loc2.getDisplayLanguage(Locale.ENGLISH)
+    if (display2.isNotBlank() && !display2.equals(raw, true) && display2.length > baseKey.length) {
+      return display2
+    }
+  } catch (_: Exception) {}
+
+  return null
+}
+
 private fun getSubtitleDisplayName(track: TrackNode): String {
   val title = track.title?.trim()
-  if (!title.isNullOrBlank()) return title
   val lang = track.lang?.trim()
-  if (!lang.isNullOrBlank()) {
-    try {
-      val displayLang = Locale.forLanguageTag(lang).getDisplayLanguage(Locale.ENGLISH)
-      if (displayLang.isNotBlank()) return displayLang
-    } catch (_: Exception) {}
-    return lang
+
+  val resolvedFromLang = resolveLanguageName(lang)
+  val resolvedFromTitle = resolveLanguageName(title)
+
+  return when {
+    // If title was a short language code like "hi" or "ta", show "Hindi", "Tamil"
+    resolvedFromTitle != null -> resolvedFromTitle
+    
+    // If title has descriptive text (e.g. "Hindi [Original]")
+    !title.isNullOrBlank() && title.length > 4 -> title
+    
+    // If lang gave full name
+    resolvedFromLang != null -> resolvedFromLang
+    
+    // If title is non-blank
+    !title.isNullOrBlank() -> title
+    
+    // Fallback
+    !lang.isNullOrBlank() -> lang
+    else -> "Subtitle #${track.id}"
   }
-  return "Track #${track.id}"
 }
