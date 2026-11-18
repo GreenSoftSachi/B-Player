@@ -47,7 +47,13 @@ enum class Decoder(val title: String, val value: String) {
   ;
 
   companion object {
-    fun getDecoderFromValue(value: String): Decoder = Decoder.entries.first { it.value == value }
+    fun getDecoderFromValue(value: String?): Decoder = when (value?.lowercase()?.trim()) {
+      "mediacodec" -> HWPlus
+      "mediacodec-copy" -> HW
+      "no", "", "none", null -> SW
+      "auto", "auto-copy" -> Auto
+      else -> Decoder.entries.firstOrNull { it.value.equals(value, ignoreCase = true) } ?: SW
+    }
   }
 }
 

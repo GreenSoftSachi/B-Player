@@ -36,34 +36,29 @@ jobs:
         run: |
           mkdir -p release-apks
           # Package the single best 64-bit APK for Android 10+ devices
-          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.1.3.apk
+          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.1.4.apk
           ls -la release-apks/
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: B-Player-v1.1.3-APK
+          name: B-Player-v1.1.4-APK
           path: release-apks/
           retention-days: 30
 
-      - name: Create GitHub Release v1.1.3
+      - name: Create GitHub Release v1.1.4
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.3
-          name: "B-Player v1.1.3 (Unified Gestures, 4K Smooth Zoom, Prev/Next & Compact Menus)"
+          tag_name: v1.1.4
+          name: "B-Player v1.1.4 (Instant SW/HW+ Decoder Switch Fix)"
           body: |
-            ## 👑 B-Player v1.1.3 - MX Perfection Edition (Single APK for Android 10+)
+            ## 👑 B-Player v1.1.4 - Seamless Decoder Switch Edition
             
-            ### 🌟 What's New in v1.1.3:
-            * 🔊 **100% Volume & Brightness Restored**: Left swipe for Brightness, Right swipe for Volume with sleek sliders.
-            * 🚀 **4K / IMAX Smooth Zoom (No Freezing)**: Throttled decoder zoom pipeline and separated multi-touch pass so 4K 10-bit HEVC videos play buttery smooth without stalling or accidental pauses.
-            * ⚡ **Compact SW / HW Dropdown**: Tapping HW/SW opens an instant compact popup menu directly under the button (`Auto`, `HW+`, `HW`, `SW`) instead of a giant bottom sheet.
-            * ⏮️ **Previous & Next Buttons**: Added `⏮️` and `⏭️` controls flanking the central Play/Pause button for effortless navigation.
-            * 💬 **Subtitle Themes & 2-Finger Resize**: Subtitle theme and styling apply instantly upon video start; pinch on subtitles to adjust font size.
-            * 📱 **Compact Three-Dots (⋮) Menu**: Tapping `⋮` opens a sleek dropdown menu on the top right for Filters, Speed, Audio Delay & Settings.
-            * 🎨 **Frosted Obsidian Glass Audio Selector**: Audio tracks selector styled in sleek Frosted Obsidian Glass with glowing cyan active indicators.
-            * 📦 **Single APK**: Exactly one clean ~78MB APK (`B-Player-v1.1.3.apk`)!
-          files: release-apks/B-Player-v1.1.3.apk
+            ### 🌟 What's New in v1.1.4:
+            * ⚡ **Instant SW / HW / HW+ Decoder Switching**: Seamless on-the-fly decoder switching with live position resume, fixing the issue where SW didn't change!
+            * 🛡️ **Robust Decoder State**: Immediate UI button update and safe fallback mapping for all libmpv decoder states.
+            * 📦 **Single APK**: Exactly one clean ~78MB APK (`B-Player-v1.1.4.apk`)!
+          files: release-apks/B-Player-v1.1.4.apk
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

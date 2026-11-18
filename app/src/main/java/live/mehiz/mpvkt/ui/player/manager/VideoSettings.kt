@@ -4,7 +4,11 @@ import `is`.xyz.mpv.MPV
 import `is`.xyz.mpv.prop
 import `is`.xyz.mpv.propFlow
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import live.mehiz.mpvkt.preferences.AdvancedPreferences
 import live.mehiz.mpvkt.preferences.DecoderPreferences
 import live.mehiz.mpvkt.preferences.PlayerPreferences
@@ -23,8 +27,21 @@ class VideoSettings(
   private val playerPreferences: PlayerPreferences,
   scope: CoroutineScope,
 ) {
-  val decoder: StateFlow<Decoder> = mpv.propFlow<String>("hwdec-current")
-    .mapState(scope, { Decoder.Auto }, Decoder::getDecoderFromValue)
+  private val _decoder = MutableStateFlow(
+    if (decoderPreferences.tryHWDecoding.get()) Decoder.HWPlus else Decoder.SW,
+  )
+  val decoder: StateFlow<Decoder> = _decoder.asStateFlow()
+
+  init {
+    scope.launch {
+      mpv.propFlow<String>("hwdec-current").collectLatest { current ->
+        if (current.isNotBlank() && current != "no") {
+          _decoder.value = Decoder.getDecoderFromValue(current)
+        }
+      }
+    }
+  }
+
   val isGpuNext: StateFlow<Boolean> = mpv.propFlow<String>("vo").mapState(scope, { false }) { it == "gpu-next" }
   val debanding: StateFlow<Debanding> = decoderPreferences.debanding.stateIn(scope)
   val debandSettings: Map<DebandSettings, StateFlow<Int>> =
@@ -38,8 +55,24 @@ class VideoSettings(
   val statisticsPage: StateFlow<Int> = advancedPreferences.enabledStatisticsPage.stateIn(scope)
   val aspect: StateFlow<VideoAspect> = playerPreferences.videoAspect.stateIn(scope)
 
-  fun setDecoder(decoder: Decoder) {
-    mpv.prop("hwdec", decoder.value)
+  fun setDecoder(dec: Decoder) {
+    _decoder.value = dec
+    val hwdecValue = when (dec) {
+      Decoder.SW -> "no"
+      Decoder.HW -> "mediacodec-copy"
+      Decoder.HWPlus -> "mediacodec"
+      Decoder.Auto, Decoder.AutoCopy -> "auto"
+    }
+    mpv.prop("hwdec", hwdecValue)
+    try {
+      val pos = mpv.getPropertyDouble("time-pos") ?: 0.0
+      val path = mpv.getPropertyString("path")
+      if (!path.isNullOrBlank()) {
+        mpv.command("loadfile", path, "replace", "start=$pos")
+      } else {
+        mpv.command("seek", "0", "relative+exact")
+      }
+    } catch (_: Exception) {}
   }
 
   fun cycleDecoder() {
