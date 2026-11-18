@@ -1,0 +1,69 @@
+name: Build & Release B-Player
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: "Build B-Player APKs"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build Debug APKs with Gradle
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Locate Generated APKs
+        run: |
+          mkdir -p release-apks
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} release-apks/ \;
+          ls -la release-apks/
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: B-Player-v1.0.0-APKs
+          path: release-apks/
+          retention-days: 30
+
+      - name: Create GitHub Release v1.0.0
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: "B-Player v1.0.0 (Ultimate Hybrid Media Player)"
+          body: |
+            ## 👑 B-Player v1.0.0 - The Ultimate Hybrid Android Media Player
+            
+            **B-Player** combines the world's most powerful playback and UI technologies into one unified, ad-free beast player:
+            
+            ### 🚀 Core Highlights:
+            * 🎬 **`libmpv` Core Playback Engine**: Zero-compromise playback for 4K 10-bit HEVC, Dolby Vision (Profile 8.1), HDR10+, AV1, VP9, and ProRes.
+            * 🔊 **Audio Beast**: Native support and dialogue-enhanced stereo downmixing for 6-Channel (5.1 Surround) HE-AAC, AC-3, E-AC-3 Dolby Atmos, DTS-HD, and TrueHD.
+            * 💬 **World's Best Subtitle Engine (`libass`)**: Flawless rendering for styled, animated, and karaoke `.ass` / `.ssa` subtitles, dual subtitles, and external `.srt` / `.vtt` loading.
+            * 🎨 **Jetpack Compose (Material 3) UI**: Fluid bottom sheets for audio tracks and subtitles, Continue Watching / History tracking with resume progress bars, sleep timer, speed preset chips.
+            * 🖐️ **Full MX Player Gesture Suite**: Left vertical swipe (Brightness), right vertical swipe (Volume), horizontal scrubbing, double-tap 10s seek, pinch-to-zoom crop, smooth PiP.
+            
+            Download the APK below to install on your Android device!
+          files: release-apks/*.apk
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
