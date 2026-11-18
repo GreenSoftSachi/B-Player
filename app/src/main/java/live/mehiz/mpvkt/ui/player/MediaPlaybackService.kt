@@ -370,6 +370,9 @@ class MediaPlaybackService : MediaBrowserServiceCompat() {
     mpv.setOptionString("audio-delay", (audioPreferences.defaultAudioDelay.get() / 1000.0).toString())
     mpv.setOptionString("audio-pitch-correction", audioPreferences.audioPitchCorrection.get().toString())
     mpv.setOptionString("volume-max", (audioPreferences.volumeBoostCap.get() + 100).toString())
+    if (audioPreferences.useSwAudioDecoder.get()) {
+      mpv.setOptionString("ad", "lavc:*")
+    }
   }
 
   private fun setupSubtitlesOptions() {

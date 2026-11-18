@@ -47,8 +47,7 @@ fun TopRightPlayerControls(
   onAddSubtitle: () -> Unit = {},
   onSubtitlesLongClick: () -> Unit = {},
   // audio
-  audioTracks: ImmutableList<TrackNode> = persistentListOf(),
-  onSelectAudio: (Int) -> Unit = {},
+  onAudioClick: () -> Unit = {},
   onAudioLongClick: () -> Unit = {},
   // more dropdown actions
   onOpenVideoFilters: () -> Unit,
@@ -173,57 +172,11 @@ fun TopRightPlayerControls(
       }
     }
 
-    var isAudioMenuOpen by remember { mutableStateOf(false) }
-    Box {
-      ControlsButton(
-        Icons.Default.Audiotrack,
-        onClick = { isAudioMenuOpen = true },
-        onLongClick = onAudioLongClick,
-      )
-      DropdownMenu(
-        expanded = isAudioMenuOpen,
-        onDismissRequest = { isAudioMenuOpen = false },
-        modifier = Modifier
-          .background(Color(0xCC0D1420), RoundedCornerShape(14.dp))
-          .border(BorderStroke(1.dp, Color(0x3300E5FF)), RoundedCornerShape(14.dp)),
-      ) {
-        audioTracks.forEach { track ->
-          val isSelected = (track.mainSelection?.toInt() ?: -1) > -1 || track.selected == true
-          val title = getAudioDisplayName(track)
-          DropdownMenuItem(
-            text = {
-              Text(
-                title,
-                color = if (isSelected) Color(0xFF00E5FF) else Color.White,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-              )
-            },
-            onClick = {
-              isAudioMenuOpen = false
-              onSelectAudio(track.id)
-            },
-          )
-        }
-
-        if (audioTracks.isNotEmpty()) {
-          HorizontalDivider(color = Color(0x33FFFFFF))
-        }
-
-        DropdownMenuItem(
-          text = {
-            Text(
-              "🎵 Audio Delay...",
-              color = Color(0xFF00E5FF),
-              fontWeight = FontWeight.SemiBold,
-            )
-          },
-          onClick = {
-            isAudioMenuOpen = false
-            onOpenAudioDelay()
-          },
-        )
-      }
-    }
+    ControlsButton(
+      Icons.Default.Audiotrack,
+      onClick = onAudioClick,
+      onLongClick = onAudioLongClick,
+    )
 
     var isMoreMenuOpen by remember { mutableStateOf(false) }
     Box {
@@ -429,31 +382,5 @@ private fun getSubtitleDisplayName(track: TrackNode): String {
     // Fallback
     !lang.isNullOrBlank() -> lang
     else -> "Subtitle #${track.id}"
-  }
-}
-
-private fun getAudioDisplayName(track: TrackNode): String {
-  val title = track.title?.trim()
-  val lang = track.lang?.trim()
-
-  val resolvedFromLang = resolveLanguageName(lang)
-  val resolvedFromTitle = resolveLanguageName(title)
-
-  val channels = when ((track.demuxChannelCount ?: track.audioChannels)?.toInt()) {
-    6 -> "5.1"
-    8 -> "7.1"
-    2 -> "Stereo"
-    1 -> "Mono"
-    else -> null
-  }
-  val channelSuffix = if (channels != null) " ($channels)" else ""
-
-  return when {
-    resolvedFromTitle != null -> resolvedFromTitle + channelSuffix
-    !title.isNullOrBlank() && title.length > 4 -> title + channelSuffix
-    resolvedFromLang != null -> resolvedFromLang + channelSuffix
-    !title.isNullOrBlank() -> title + channelSuffix
-    !lang.isNullOrBlank() -> lang + channelSuffix
-    else -> "Audio Track #${track.id}$channelSuffix"
   }
 }

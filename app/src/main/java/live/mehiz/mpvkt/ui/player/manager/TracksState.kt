@@ -67,6 +67,14 @@ class TracksState(private val mpv: MPV, private val context: Context, json: Json
     if (id == mpv.getPropertyInt("aid")) mpv.prop("aid", false) else mpv.prop("aid", id)
   }
 
+  fun selectAudio(id: Int) {
+    mpv.prop("aid", id)
+  }
+
+  fun disableAudio() {
+    mpv.prop("aid", false)
+  }
+
   fun addSubtitle(uri: Uri) {
     manuallyDisabled = false
     val path = when (uri.scheme) {
@@ -79,8 +87,11 @@ class TracksState(private val mpv: MPV, private val context: Context, json: Json
   }
 
   fun addAudio(uri: Uri) {
-    val url = uri.toString()
-    val path = if (url.startsWith("content://")) uri.openContentFd(context) else url
-    mpv.command("audio-add", path ?: return, "cached")
+    val path = when (uri.scheme) {
+      "content" -> uri.openContentFd(context) ?: uri.toString()
+      "file" -> uri.path ?: uri.toString()
+      else -> uri.toString()
+    }
+    mpv.command("audio-add", path ?: return, "select")
   }
 }

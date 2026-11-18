@@ -12,6 +12,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import live.mehiz.mpvkt.ui.player.controls.components.SubtitleFileBrowserDialog
+import live.mehiz.mpvkt.ui.player.controls.components.AudioTracksDialog
+import live.mehiz.mpvkt.ui.player.controls.components.AudioFileBrowserDialog
 import java.io.File
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -164,9 +166,11 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
   val sheetShown by viewModel.sheetShown.collectAsState()
   val panelShown by viewModel.panelShown.collectAsState()
   var isSubtitleBrowserOpen by remember { mutableStateOf(false) }
+  var isAudioDialogOpen by remember { mutableStateOf(false) }
+  var isAudioBrowserOpen by remember { mutableStateOf(false) }
   var wasPlayingBeforeMenu by remember { mutableStateOf(false) }
 
-  val isAnyMenuOpen = sheetShown != Sheets.None || panelShown != Panels.None || isSubtitleBrowserOpen
+  val isAnyMenuOpen = sheetShown != Sheets.None || panelShown != Panels.None || isSubtitleBrowserOpen || isAudioDialogOpen || isAudioBrowserOpen
 
   LaunchedEffect(isAnyMenuOpen) {
     if (isAnyMenuOpen) {
@@ -594,8 +598,7 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
             onDisableSubtitles = playerManager.tracks::disableSubtitles,
             onAddSubtitle = { isSubtitleBrowserOpen = true },
             onSubtitlesLongClick = { onOpenPanel(Panels.SubtitleSettings) },
-            audioTracks = audioTracks,
-            onSelectAudio = { playerManager.tracks.toggleAudio(it) },
+            onAudioClick = { isAudioDialogOpen = true },
             onAudioLongClick = { onOpenPanel(Panels.AudioDelay) },
             onOpenVideoFilters = { onOpenPanel(Panels.VideoFilters) },
             onOpenPlaybackSpeed = { onOpenSheet(Sheets.PlaybackSpeed) },
@@ -700,6 +703,45 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
           isSubtitleBrowserOpen = false
         },
         onDismissRequest = { isSubtitleBrowserOpen = false },
+      )
+    }
+
+    if (isAudioDialogOpen) {
+      val useSwAudioDecoder by audioPreferences.useSwAudioDecoder.collectAsState()
+      AudioTracksDialog(
+        tracks = audioTracks,
+        useSwAudioDecoder = useSwAudioDecoder,
+        onToggleSwAudioDecoder = { enabled ->
+          audioPreferences.useSwAudioDecoder.set(enabled)
+          playerManager.tracks.mpv.setPropertyString("ad", if (enabled) "lavc:*" else "all")
+        },
+        onSelectTrack = { track ->
+          playerManager.tracks.selectAudio(track.id)
+        },
+        onDisableAudio = {
+          playerManager.tracks.disableAudio()
+        },
+        onOpenAudioBrowser = {
+          isAudioDialogOpen = false
+          isAudioBrowserOpen = true
+        },
+        onOpenAudioDelay = {
+          isAudioDialogOpen = false
+          onOpenPanel(Panels.AudioDelay)
+        },
+        onDismissRequest = { isAudioDialogOpen = false },
+      )
+    }
+
+    if (isAudioBrowserOpen) {
+      val resolvedFolder = resolveParentFolder(context, currentVideoPath, folderPath)
+      AudioFileBrowserDialog(
+        initialDirectory = resolvedFolder,
+        onSelectAudioFile = { file ->
+          playerManager.tracks.addAudio(Uri.fromFile(file))
+          isAudioBrowserOpen = false
+        },
+        onDismissRequest = { isAudioBrowserOpen = false },
       )
     }
   }
