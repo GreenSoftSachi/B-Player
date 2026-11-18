@@ -5,26 +5,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreTime
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.collections.immutable.ImmutableList
-import live.mehiz.mpvkt.R
 import live.mehiz.mpvkt.ui.player.TrackNode
 import live.mehiz.mpvkt.ui.theme.spacing
-import me.zhanghai.compose.preference.FooterPreference
-import me.zhanghai.compose.preference.ProvidePreferenceLocals
 
 @Composable
 fun SubtitlesSheet(
@@ -41,16 +34,8 @@ fun SubtitlesSheet(
     onDismissRequest = onDismissRequest,
     header = {
       AddTrackRow(
-        stringResource(R.string.player_sheets_add_ext_sub),
+        "Open Subtitle File",
         onAddSubtitle,
-        actions = {
-          IconButton(onClick = onOpenSubtitleSettings) {
-            Icon(Icons.Default.Palette, null)
-          }
-          IconButton(onClick = onOpenSubtitleDelay) {
-            Icon(Icons.Default.MoreTime, null)
-          }
-        },
       )
     },
     track = { track ->
@@ -60,21 +45,13 @@ fun SubtitlesSheet(
         onClick = { onSelect(track.id) },
       )
     },
-    footer = {
-      ProvidePreferenceLocals {
-        FooterPreference(
-          summary = {
-            Text(stringResource(R.string.player_sheets_subtitles_footer_secondary_sid_no_styles))
-          },
-        )
-      }
-    },
     modifier = modifier,
   )
 }
 
 @Composable
 fun SubtitleTrackRow(title: String, selected: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+  val isSelected = selected > -1
   Row(
     modifier = modifier
       .fillMaxWidth()
@@ -83,20 +60,26 @@ fun SubtitleTrackRow(title: String, selected: Int, onClick: () -> Unit, modifier
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Checkbox(
-      selected > -1,
+      isSelected,
       onCheckedChange = { _ -> onClick() },
+      colors = CheckboxDefaults.colors(
+        checkedColor = Color(0xFF00E5FF),
+        uncheckedColor = Color(0xFF8A99AD),
+      ),
     )
     Text(
       title,
-      fontStyle = if (selected > -1) FontStyle.Italic else FontStyle.Normal,
-      fontWeight = if (selected > -1) FontWeight.ExtraBold else FontWeight.Normal,
+      color = if (isSelected) Color(0xFF00E5FF) else Color.White,
+      fontStyle = if (isSelected) FontStyle.Italic else FontStyle.Normal,
+      fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
     )
     Spacer(modifier = Modifier.weight(1f))
     if (selected != -1) {
       Text(
         "#${selected + 1}",
-        fontStyle = if (selected > -1) FontStyle.Italic else FontStyle.Normal,
-        fontWeight = if (selected > -1) FontWeight.ExtraBold else FontWeight.Normal,
+        color = Color(0xFF00E5FF),
+        fontStyle = FontStyle.Italic,
+        fontWeight = FontWeight.Bold,
       )
     }
   }

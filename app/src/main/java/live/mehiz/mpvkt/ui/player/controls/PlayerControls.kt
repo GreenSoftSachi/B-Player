@@ -17,6 +17,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.SkipNext
@@ -37,6 +39,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -60,6 +63,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import dev.vivvvek.seeker.Segment
@@ -350,19 +354,32 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
           val interaction = remember { MutableInteractionSource() }
           when {
             gestureSeekAmount != null -> {
-              Text(
-                stringResource(
-                  R.string.player_gesture_seek_indicator,
-                  if (gestureSeekAmount!!.second >= 0) '+' else '-',
-                  Utils.prettyTime(abs(gestureSeekAmount!!.second)),
-                  Utils.prettyTime(gestureSeekAmount!!.first + gestureSeekAmount!!.second),
-                ),
-                style = MaterialTheme.typography.headlineMedium.copy(
-                  shadow = Shadow(Color.Black, blurRadius = 5f),
-                ),
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-              )
+              val seekDiff = gestureSeekAmount!!.second
+              val targetPos = gestureSeekAmount!!.first + seekDiff
+              Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Black.copy(alpha = 0.75f),
+                border = BorderStroke(1.dp, Color(0x6600E5FF)),
+              ) {
+                Row(
+                  verticalAlignment = Alignment.CenterVertically,
+                  horizontalArrangement = Arrangement.spacedBy(8.dp),
+                  modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                ) {
+                  Text(
+                    text = "${if (seekDiff >= 0) "+" else "-"}${Utils.prettyTime(abs(seekDiff))}",
+                    color = Color(0xFF00E5FF),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                  )
+                  Text(
+                    text = "(${Utils.prettyTime(targetPos)})",
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 13.sp,
+                  )
+                }
+              }
             }
 
             pausedForCache && showLoadingCircle -> {

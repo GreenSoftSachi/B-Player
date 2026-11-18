@@ -210,7 +210,12 @@ class MediaPlaybackService : MediaBrowserServiceCompat() {
     val path = getPlayableUri(intent) ?: return
     if (fileName.isNotBlank()) saveState()
     playIntent = intent
-    if (hasSurface) mpv.command("loadfile", path) else pendingFile = path
+    if (hasSurface) {
+      mpv.command("loadfile", path)
+      mpv.prop("pause", false)
+    } else {
+      pendingFile = path
+    }
     requestAudioFocus()
     mediaSession.isActive = true
   }
@@ -254,7 +259,10 @@ class MediaPlaybackService : MediaBrowserServiceCompat() {
     mpv.setPropertyString("vo", voInUse)
     savedVid?.let { mpv.setPropertyString("vid", it) }
     savedVid = null
-    pendingFile?.let { mpv.command("loadfile", it) }
+    pendingFile?.let {
+      mpv.command("loadfile", it)
+      mpv.prop("pause", false)
+    }
     pendingFile = null
   }
 
@@ -506,6 +514,7 @@ class MediaPlaybackService : MediaBrowserServiceCompat() {
     if (title.isNullOrBlank() || title.isDigitsOnly()) mpv.setPropertyString("media-title", fileName)
     val name = fileName
     ioScope.launch { loadVideoPlaybackState(name) }
+    mpv.prop("pause", false)
   }
 
   private fun setIntentExtras(extras: android.os.Bundle?) {

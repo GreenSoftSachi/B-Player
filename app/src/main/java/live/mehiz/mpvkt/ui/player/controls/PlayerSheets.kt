@@ -1,9 +1,14 @@
 package live.mehiz.mpvkt.ui.player.controls
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import java.io.File
 import dev.vivvvek.seeker.Segment
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -71,7 +76,20 @@ fun PlayerSheets(
 
     Sheets.SubtitleTracks -> {
       val subtitlesPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
+        object : ActivityResultContracts.OpenDocument() {
+          override fun createIntent(context: Context, input: Array<String>): Intent {
+            val intent = super.createIntent(context, input)
+            try {
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val rootDir = android.os.Environment.getExternalStorageDirectory()
+                val moviesDir = File(rootDir, "Movies")
+                val target = if (moviesDir.exists()) moviesDir else rootDir
+                intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.fromFile(target))
+              }
+            } catch (_: Exception) {}
+            return intent
+          }
+        },
       ) {
         if (it == null) return@rememberLauncherForActivityResult
         onAddSubtitle(it)

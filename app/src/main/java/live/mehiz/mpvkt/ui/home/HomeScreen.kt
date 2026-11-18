@@ -559,16 +559,17 @@ fun FolderRowItem(
       )
       if (folder.videoCount > 0) {
         Surface(
-          shape = CircleShape,
-          color = Color(0xFFFF3B30),
-          modifier = Modifier.offset(x = 6.dp, y = (-3).dp),
+          shape = RoundedCornerShape(10.dp),
+          color = Color(0xFFFF2A2A),
+          border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
+          modifier = Modifier.offset(x = 8.dp, y = (-4).dp),
         ) {
           Text(
-            text = if (folder.videoCount > 99) "99+" else folder.videoCount.toString(),
+            text = if (folder.videoCount > 99) " 99+ " else " ${folder.videoCount} ",
             color = Color.White,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             fontSize = 9.sp,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
           )
         }
       }
@@ -634,14 +635,15 @@ fun CompactFolderGridCard(
         )
         if (folder.videoCount > 0) {
           Surface(
-            shape = CircleShape,
-            color = Color(0xFFFF3B30),
-            modifier = Modifier.offset(x = 6.dp, y = (-3).dp),
+            shape = RoundedCornerShape(10.dp),
+            color = Color(0xFFFF2A2A),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
+            modifier = Modifier.offset(x = 8.dp, y = (-4).dp),
           ) {
             Text(
-              text = if (folder.videoCount > 99) "99+" else folder.videoCount.toString(),
+              text = if (folder.videoCount > 99) " 99+ " else " ${folder.videoCount} ",
               color = Color.White,
-              fontWeight = FontWeight.Bold,
+              fontWeight = FontWeight.ExtraBold,
               fontSize = 9.sp,
               modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
             )

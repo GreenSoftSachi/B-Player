@@ -36,29 +36,32 @@ jobs:
         run: |
           mkdir -p release-apks
           # Package the single best 64-bit APK for Android 10+ devices
-          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.1.4.apk
+          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.1.5.apk
           ls -la release-apks/
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: B-Player-v1.1.4-APK
+          name: B-Player-v1.1.5-APK
           path: release-apks/
           retention-days: 30
 
-      - name: Create GitHub Release v1.1.4
+      - name: Create GitHub Release v1.1.5
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.4
-          name: "B-Player v1.1.4 (Instant SW/HW+ Decoder Switch Fix)"
+          tag_name: v1.1.5
+          name: "B-Player v1.1.5 (Instant Auto-Play, Compact Seek Pill, Clean Subtitles & Framed Red Badges)"
           body: |
-            ## 👑 B-Player v1.1.4 - Seamless Decoder Switch Edition
+            ## 👑 B-Player v1.1.5 - Smart UI & Instant Playback Edition
             
-            ### 🌟 What's New in v1.1.4:
-            * ⚡ **Instant SW / HW / HW+ Decoder Switching**: Seamless on-the-fly decoder switching with live position resume, fixing the issue where SW didn't change!
-            * 🛡️ **Robust Decoder State**: Immediate UI button update and safe fallback mapping for all libmpv decoder states.
-            * 📦 **Single APK**: Exactly one clean ~78MB APK (`B-Player-v1.1.4.apk`)!
-          files: release-apks/B-Player-v1.1.4.apk
+            ### 🌟 What's New in v1.1.5:
+            * ▶️ **One-Click Instant Auto-Play**: Tapping any video now starts playback immediately without having to manually hit play!
+            * ⏱️ **Smart Compact Seek Pill**: Replaced the huge screen-covering seek text with a sleek, compact smart time pill.
+            * 💬 **Clean Subtitle Dialog**: Removed all confusing cluttered settings and footer text; simply shows available tracks and an intuitive "Open Subtitle File" button.
+            * 📂 **Direct Subtitle Folder Browsing**: Subtitle file picker launches directly in the folder where the movie is stored!
+            * 🏷️ **Framed Pill Red Badges**: Folder video counts now display in an elegant elongated pill badge with a crisp white border frame!
+            * 📦 **Single APK**: Exactly one clean ~78MB APK (`B-Player-v1.1.5.apk`)!
+          files: release-apks/B-Player-v1.1.5.apk
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
