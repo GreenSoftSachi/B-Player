@@ -45,22 +45,22 @@ jobs:
           path: release-apks/
           retention-days: 30
 
-      - name: Create GitHub Release v1.0.0
+      - name: Create GitHub Release v1.1.0
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: "B-Player v1.0.0 (Ultimate Hybrid Media Player)"
+          tag_name: v1.1.0
+          name: "B-Player v1.1.0 (Full MX Player Folder Suite & Media Library)"
           body: |
-            ## 👑 B-Player v1.0.0 - The Ultimate Hybrid Android Media Player
+            ## 👑 B-Player v1.1.0 - Full Media Library & Folder Suite Release
             
-            **B-Player** combines the world's most powerful playback and UI technologies into one unified, ad-free beast player:
-            
-            ### 🚀 Core Highlights:
-            * 🎬 **`libmpv` Core Playback Engine**: Zero-compromise playback for 4K 10-bit HEVC, Dolby Vision (Profile 8.1), HDR10+, AV1, VP9, and ProRes.
-            * 🔊 **Audio Beast**: Native support and dialogue-enhanced stereo downmixing for 6-Channel (5.1 Surround) HE-AAC, AC-3, E-AC-3 Dolby Atmos, DTS-HD, and TrueHD.
-            * 💬 **World's Best Subtitle Engine (`libass`)**: Flawless rendering for styled, animated, and karaoke `.ass` / `.ssa` subtitles, dual subtitles, and external `.srt` / `.vtt` loading.
-            * 🎨 **Jetpack Compose (Material 3) UI**: Fluid bottom sheets for audio tracks and subtitles, Continue Watching / History tracking with resume progress bars, sleep timer, speed preset chips.
-            * 🖐️ **Full MX Player Gesture Suite**: Left vertical swipe (Brightness), right vertical swipe (Volume), horizontal scrubbing, double-tap 10s seek, pinch-to-zoom crop, smooth PiP.
+            ### 🌟 Major Upgrades in v1.1.0:
+            * 📁 **Full Media Auto-Scanner**: No more empty white screens or manual URL boxes! B-Player now automatically scans and indexes all your videos and movies.
+            * 🔴 **Iconic Folder Red Badges**: Real-time video count badges (`1`, `2`, `5`, `13`, `99+`) on folder cards just like classic MX Player.
+            * 🎛️ **2-Column Grid View & List Toggle**: Switch seamlessly between modern 2-column card grids and streamlined list views.
+            * 📄 **Folder View vs Flat Files Mode**: Browse by directory hierarchy or view all videos in one clean list.
+            * 🧹 **Junk File Cleaner**: Automatic filter removing zero-duration and <200KB dummy development files.
+            * 🔙 **Smart Back Navigation**: Back button smoothly returns from a folder to the main folder list instead of closing the app.
+            * 🚀 **Unrivaled Playback**: Built on the beast `libmpv` C++ playback engine and `libass` subtitle engine for flawless 4K 10-bit HEVC, Dolby Vision, and 6CH EAC3 Atmos audio.
             
             Download the APK below to install on your Android device!
           files: release-apks/*.apk
