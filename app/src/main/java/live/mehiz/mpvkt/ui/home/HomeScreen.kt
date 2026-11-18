@@ -8,9 +8,11 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Size
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +69,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -560,8 +565,8 @@ fun FolderRowItem(
       if (folder.videoCount > 0) {
         Box(
           modifier = Modifier
-            .offset(x = 6.dp, y = (-4).dp)
-            .size(20.dp)
+            .offset(x = 4.dp, y = (-3).dp)
+            .size(16.dp)
             .clip(CircleShape)
             .background(Color(0xFFFF2A2A)),
           contentAlignment = Alignment.Center,
@@ -570,7 +575,8 @@ fun FolderRowItem(
             text = if (folder.videoCount > 99) "99+" else folder.videoCount.toString(),
             color = Color.White,
             fontWeight = FontWeight.Bold,
-            fontSize = 9.sp,
+            fontSize = 8.sp,
+            lineHeight = 8.sp,
             textAlign = TextAlign.Center,
           )
         }
@@ -638,8 +644,8 @@ fun CompactFolderGridCard(
         if (folder.videoCount > 0) {
           Box(
             modifier = Modifier
-              .offset(x = 6.dp, y = (-4).dp)
-              .size(20.dp)
+              .offset(x = 4.dp, y = (-3).dp)
+              .size(16.dp)
               .clip(CircleShape)
               .background(Color(0xFFFF2A2A)),
             contentAlignment = Alignment.Center,
@@ -648,7 +654,8 @@ fun CompactFolderGridCard(
               text = if (folder.videoCount > 99) "99+" else folder.videoCount.toString(),
               color = Color.White,
               fontWeight = FontWeight.Bold,
-              fontSize = 9.sp,
+              fontSize = 8.sp,
+              lineHeight = 8.sp,
               textAlign = TextAlign.Center,
             )
           }
@@ -669,10 +676,28 @@ fun CompactFolderGridCard(
 }
 
 @Composable
+fun rememberVideoThumbnail(uri: Uri, width: Int, height: Int): ImageBitmap? {
+  val context = LocalContext.current
+  var bitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
+  LaunchedEffect(uri) {
+    withContext(Dispatchers.IO) {
+      try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+          val bm = context.contentResolver.loadThumbnail(uri, Size(width, height), null)
+          bitmap = bm.asImageBitmap()
+        }
+      } catch (_: Exception) {}
+    }
+  }
+  return bitmap
+}
+
+@Composable
 fun VideoRowItem(
   video: VideoItem,
   onClick: () -> Unit,
 ) {
+  val thumbnail = rememberVideoThumbnail(video.uri, 180, 110)
   Row(
     modifier = Modifier
       .fillMaxWidth()
@@ -682,20 +707,29 @@ fun VideoRowItem(
   ) {
     Box(
       modifier = Modifier
-        .size(68.dp, 44.dp)
+        .size(76.dp, 48.dp)
         .clip(RoundedCornerShape(6.dp))
-        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        .background(Color(0xFF1E2430)),
       contentAlignment = Alignment.Center,
     ) {
-      Icon(
-        Icons.Default.PlayArrow,
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.size(22.dp),
-      )
+      if (thumbnail != null) {
+        Image(
+          bitmap = thumbnail,
+          contentDescription = null,
+          contentScale = ContentScale.Crop,
+          modifier = Modifier.fillMaxSize(),
+        )
+      } else {
+        Icon(
+          Icons.Default.PlayArrow,
+          contentDescription = null,
+          tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+          modifier = Modifier.size(22.dp),
+        )
+      }
       Surface(
-        shape = RoundedCornerShape(3.dp),
-        color = Color.Black.copy(alpha = 0.75f),
+        shape = RoundedCornerShape(2.dp),
+        color = Color(0xCC000000),
         modifier = Modifier
           .align(Alignment.BottomEnd)
           .padding(2.dp),
@@ -703,9 +737,10 @@ fun VideoRowItem(
         Text(
           text = video.formatDuration(),
           color = Color.White,
-          fontSize = 9.sp,
+          fontSize = 8.sp,
+          fontWeight = FontWeight.Medium,
           fontFamily = FontFamily.Monospace,
-          modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
+          modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp),
         )
       }
     }
@@ -750,6 +785,7 @@ fun CompactVideoGridCard(
   video: VideoItem,
   onClick: () -> Unit,
 ) {
+  val thumbnail = rememberVideoThumbnail(video.uri, 280, 160)
   Card(
     modifier = Modifier
       .fillMaxWidth()
@@ -765,18 +801,27 @@ fun CompactVideoGridCard(
         modifier = Modifier
           .fillMaxWidth()
           .height(76.dp)
-          .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+          .background(Color(0xFF1E2430)),
         contentAlignment = Alignment.Center,
       ) {
-        Icon(
-          Icons.Default.PlayArrow,
-          contentDescription = null,
-          tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-          modifier = Modifier.size(28.dp),
-        )
+        if (thumbnail != null) {
+          Image(
+            bitmap = thumbnail,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+          )
+        } else {
+          Icon(
+            Icons.Default.PlayArrow,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+            modifier = Modifier.size(28.dp),
+          )
+        }
         Surface(
-          shape = RoundedCornerShape(3.dp),
-          color = Color.Black.copy(alpha = 0.75f),
+          shape = RoundedCornerShape(2.dp),
+          color = Color(0xCC000000),
           modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(3.dp),
@@ -784,9 +829,10 @@ fun CompactVideoGridCard(
           Text(
             text = video.formatDuration(),
             color = Color.White,
-            fontSize = 9.sp,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Medium,
             fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
+            modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp),
           )
         }
       }
