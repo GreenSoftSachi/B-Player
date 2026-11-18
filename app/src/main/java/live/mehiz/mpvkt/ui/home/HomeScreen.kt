@@ -11,7 +11,6 @@ import android.provider.MediaStore
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.net.toUri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,10 +19,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,6 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Movie
@@ -44,8 +44,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoFile
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -72,10 +70,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -96,6 +96,7 @@ data class VideoItem(
   val uri: Uri,
   val resolution: String,
   val dateAdded: Long,
+  val segments: List<String> = emptyList(),
 ) {
   fun formatDuration(): String {
     val totalSec = durationMs / 1000
@@ -119,10 +120,10 @@ data class VideoItem(
   }
 }
 
-data class FolderGroup(
+data class SubFolderInfo(
   val name: String,
-  val path: String,
-  val videos: List<VideoItem>,
+  val fullPathList: List<String>,
+  val videoCount: Int,
 )
 
 @Serializable
@@ -136,8 +137,7 @@ object HomeScreen : Screen {
     val coroutineScope = rememberCoroutineScope()
 
     var allVideos by remember { mutableStateOf<List<VideoItem>>(emptyList()) }
-    var folderGroups by remember { mutableStateOf<List<FolderGroup>>(emptyList()) }
-    var activeFolder by remember { mutableStateOf<FolderGroup?>(null) }
+    var currentPath by remember { mutableStateOf<List<String>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isGridView by remember { mutableStateOf(false) }
     var isFoldersMode by remember { mutableStateOf(true) }
@@ -146,11 +146,16 @@ object HomeScreen : Screen {
       coroutineScope.launch {
         isLoading = true
         val videos = withContext(Dispatchers.IO) { queryVideos(context) }
-        val folders = withContext(Dispatchers.IO) { groupIntoFolders(videos) }
         allVideos = videos
-        folderGroups = folders
-        if (activeFolder != null) {
-          activeFolder = folders.find { it.path == activeFolder?.path }
+
+        // If at root and there is an obvious primary folder like "TV", auto-open it or stay at root
+        if (currentPath.isEmpty() && videos.isNotEmpty()) {
+          val topFolders = videos.mapNotNull { it.segments.firstOrNull() }.distinct()
+          if (topFolders.size == 1) {
+            currentPath = listOf(topFolders.first())
+          } else if (topFolders.contains("TV")) {
+            currentPath = listOf("TV")
+          }
         }
         isLoading = false
       }
@@ -186,9 +191,50 @@ object HomeScreen : Screen {
       }
     }
 
-    // Handle back button: if inside a folder, return to folder list!
-    BackHandler(enabled = activeFolder != null) {
-      activeFolder = null
+    // Back button: navigate up one folder level!
+    BackHandler(enabled = isFoldersMode && currentPath.isNotEmpty()) {
+      currentPath = currentPath.dropLast(1)
+    }
+
+    // Compute visible subfolders and direct videos for currentPath
+    val matchingVideos = remember(allVideos, currentPath) {
+      allVideos.filter { v ->
+        v.segments.size >= currentPath.size && v.segments.take(currentPath.size) == currentPath
+      }
+    }
+
+    val visibleSubFolders = remember(matchingVideos, currentPath) {
+      if (!isFoldersMode) return@remember emptyList()
+      val depth = currentPath.size
+      val groups = matchingVideos
+        .filter { it.segments.size > depth }
+        .groupBy { it.segments[depth] }
+
+      groups.map { (subName, vids) ->
+        SubFolderInfo(
+          name = subName,
+          fullPathList = currentPath + subName,
+          videoCount = vids.size,
+        )
+      }.sortedBy { it.name.lowercase(Locale.ROOT) }
+    }
+
+    val visibleDirectVideos = remember(matchingVideos, currentPath, isFoldersMode, allVideos) {
+      if (!isFoldersMode) {
+        allVideos
+      } else {
+        matchingVideos.filter { it.segments.size == currentPath.size }
+      }
+    }
+
+    val currentFolderTitle = remember(currentPath, isFoldersMode) {
+      if (!isFoldersMode) {
+        "All Videos"
+      } else if (currentPath.isEmpty()) {
+        "B-Player"
+      } else {
+        currentPath.joinToString(" / ")
+      }
     }
 
     Scaffold(
@@ -197,24 +243,24 @@ object HomeScreen : Screen {
           title = {
             Column {
               Text(
-                text = if (activeFolder != null) activeFolder!!.name else "B-Player",
+                text = currentFolderTitle,
                 fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
+                fontSize = 18.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
               )
-              if (activeFolder != null) {
+              if (isFoldersMode && currentPath.isNotEmpty()) {
                 Text(
-                  text = "${activeFolder!!.videos.size} videos",
-                  fontSize = 12.sp,
+                  text = "${matchingVideos.size} videos",
+                  fontSize = 11.sp,
                   color = MaterialTheme.colorScheme.primary,
                 )
               }
             }
           },
           navigationIcon = {
-            if (activeFolder != null) {
-              IconButton(onClick = { activeFolder = null }) {
+            if (isFoldersMode && currentPath.isNotEmpty()) {
+              IconButton(onClick = { currentPath = currentPath.dropLast(1) }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
               }
             } else {
@@ -228,18 +274,15 @@ object HomeScreen : Screen {
             }
           },
           actions = {
-            // Grid / List toggle
             IconButton(onClick = { isGridView = !isGridView }) {
               Icon(
                 if (isGridView) Icons.AutoMirrored.Filled.List else Icons.Default.GridView,
                 contentDescription = "Toggle Grid / List",
               )
             }
-            // Refresh Scanner
             IconButton(onClick = { scanMedia() }) {
               Icon(Icons.Default.Refresh, contentDescription = "Refresh")
             }
-            // Settings
             IconButton(onClick = { backstack.add(PreferencesScreen) }) {
               Icon(Icons.Default.Settings, contentDescription = "Settings")
             }
@@ -249,90 +292,81 @@ object HomeScreen : Screen {
           ),
         )
       },
-    ) { padding ->
+    ) { paddingValues ->
       Box(
         modifier = Modifier
           .fillMaxSize()
-          .padding(padding),
+          .padding(paddingValues),
       ) {
         if (isLoading) {
-          Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-          ) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text("Scanning media files...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+          Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
           }
         } else if (allVideos.isEmpty()) {
-          Column(
+          Box(
             modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            contentAlignment = Alignment.Center,
           ) {
-            Icon(
-              Icons.Default.Movie,
-              contentDescription = null,
-              modifier = Modifier.size(64.dp),
-              tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-              "No videos found",
-              fontSize = 18.sp,
-              fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-              "Check storage permissions or refresh",
-              fontSize = 13.sp,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          }
-        } else if (isFoldersMode && activeFolder == null) {
-          // Folders List View
-          if (isGridView) {
-            LazyVerticalGrid(
-              columns = GridCells.Fixed(2),
-              contentPadding = PaddingValues(12.dp),
-              horizontalArrangement = Arrangement.spacedBy(10.dp),
-              verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-              items(folderGroups) { folder ->
-                FolderCardGrid(folder = folder, onClick = { activeFolder = folder })
-              }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+              Icon(
+                Icons.Default.Movie,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+              )
+              Spacer(modifier = Modifier.height(12.dp))
+              Text(
+                text = "No videos found",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 16.sp,
+              )
             }
-          } else {
-            LazyColumn(
-              contentPadding = PaddingValues(vertical = 8.dp),
-            ) {
-              items(folderGroups) { folder ->
-                FolderRowItem(folder = folder, onClick = { activeFolder = folder })
-              }
+          }
+        } else if (isGridView) {
+          // Compact Adaptive Grid: ~105dp tiles, looks compact like app launcher icons!
+          LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = if (visibleSubFolders.isNotEmpty()) 105.dp else 140.dp),
+            contentPadding = PaddingValues(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxSize(),
+          ) {
+            // 1. Folders
+            items(visibleSubFolders, key = { "folder_" + it.fullPathList.joinToString("/") }) { folder ->
+              CompactFolderGridCard(
+                folder = folder,
+                onClick = { currentPath = folder.fullPathList },
+              )
+            }
+
+            // 2. Videos
+            items(visibleDirectVideos, key = { "vid_" + it.id }) { video ->
+              CompactVideoGridCard(
+                video = video,
+                onClick = { playVideo(context, video) },
+              )
             }
           }
         } else {
-          // Videos List (Inside Active Folder or Flat Files view)
-          val videosToShow = if (activeFolder != null) activeFolder!!.videos else allVideos
-          if (isGridView) {
-            LazyVerticalGrid(
-              columns = GridCells.Fixed(2),
-              contentPadding = PaddingValues(12.dp),
-              horizontalArrangement = Arrangement.spacedBy(10.dp),
-              verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-              items(videosToShow) { video ->
-                VideoCardGrid(video = video, onClick = { playVideo(context, video) })
-              }
+          // List Mode
+          LazyColumn(
+            contentPadding = PaddingValues(vertical = 6.dp),
+            modifier = Modifier.fillMaxSize(),
+          ) {
+            // Folders first
+            items(visibleSubFolders, key = { "folder_" + it.fullPathList.joinToString("/") }) { folder ->
+              FolderRowItem(
+                folder = folder,
+                onClick = { currentPath = folder.fullPathList },
+              )
             }
-          } else {
-            LazyColumn(
-              contentPadding = PaddingValues(vertical = 6.dp),
-            ) {
-              items(videosToShow) { video ->
-                VideoRowItem(video = video, onClick = { playVideo(context, video) })
-              }
+
+            // Videos
+            items(visibleDirectVideos, key = { "vid_" + it.id }) { video ->
+              VideoRowItem(
+                video = video,
+                onClick = { playVideo(context, video) },
+              )
             }
           }
         }
@@ -341,23 +375,64 @@ object HomeScreen : Screen {
   }
 
   fun playFile(filepath: String, context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, filepath.toUri()).apply {
+    val uri = if (filepath.startsWith("content://") || filepath.startsWith("file://")) {
+      filepath.toUri()
+    } else {
+      Uri.fromFile(File(filepath))
+    }
+    val intent = Intent(Intent.ACTION_VIEW, uri).apply {
       setClass(context, PlayerActivity::class.java)
     }
     context.startActivity(intent)
   }
 
   fun playFile(uri: Uri, context: Context) {
-    val intent = Intent(context, PlayerActivity::class.java).apply {
-      data = uri
+    val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+      setClass(context, PlayerActivity::class.java)
     }
     context.startActivity(intent)
   }
 
-  private fun playVideo(context: Context, video: VideoItem) {
-    val intent = Intent(context, PlayerActivity::class.java).apply {
-      data = video.uri
+  fun playVideo(context: Context, video: VideoItem) {
+    val intent = Intent(Intent.ACTION_VIEW, video.uri).apply {
+      setClass(context, PlayerActivity::class.java)
       putExtra("title", video.title)
+
+      // Auto-load external subtitles in folder
+      try {
+        val videoFile = File(video.path)
+        val parentDir = videoFile.parentFile
+        if (parentDir != null && parentDir.exists() && parentDir.isDirectory) {
+          val baseName = videoFile.nameWithoutExtension.lowercase(Locale.ROOT)
+          val subExts = setOf("srt", "ass", "ssa", "vtt", "sub")
+
+          val searchDirs = mutableListOf(parentDir)
+          File(parentDir, "subs").takeIf { it.exists() && it.isDirectory }?.let { searchDirs.add(it) }
+          File(parentDir, "subtitles").takeIf { it.exists() && it.isDirectory }?.let { searchDirs.add(it) }
+          File(parentDir, "Subs").takeIf { it.exists() && it.isDirectory }?.let { searchDirs.add(it) }
+
+          val foundSubs = mutableListOf<File>()
+          for (dir in searchDirs) {
+            dir.listFiles()?.filter { f ->
+              f.isFile && f.extension.lowercase(Locale.ROOT) in subExts
+            }?.let { files ->
+              for (f in files) {
+                if (f.nameWithoutExtension.lowercase(Locale.ROOT).startsWith(baseName) || files.size <= 5) {
+                  foundSubs.add(f)
+                }
+              }
+            }
+          }
+
+          if (foundSubs.isNotEmpty()) {
+            val subUris = foundSubs.distinctBy { it.absolutePath }.map { Uri.fromFile(it) }.toTypedArray()
+            putExtra("subs", subUris)
+            putExtra("subs.enable", arrayOf(subUris.first()))
+          }
+        }
+      } catch (e: Exception) {
+        e.printStackTrace()
+      }
     }
     context.startActivity(intent)
   }
@@ -381,7 +456,6 @@ object HomeScreen : Screen {
       MediaStore.Video.Media.HEIGHT,
     )
 
-    // Filter junk dev files: duration >= 3s and size >= 200KB
     val selection = "${MediaStore.Video.Media.SIZE} >= 204800 AND ${MediaStore.Video.Media.DURATION} >= 3000"
 
     try {
@@ -411,7 +485,6 @@ object HomeScreen : Screen {
           val width = cursor.getInt(wCol)
           val height = cursor.getInt(hCol)
 
-          // Skip hidden or system cache folders
           val lower = path.lowercase(Locale.ROOT)
           if (lower.contains("/. ") || lower.contains("/android/data/") || lower.contains("/cache/")) {
             continue
@@ -419,6 +492,7 @@ object HomeScreen : Screen {
 
           val uri = ContentUris.withAppendedId(collection, id)
           val resolution = if (width >= 3840 || height >= 2160) "4K" else if (width >= 1280 || height >= 720) "HD" else "SD"
+          val segments = getRelativeDirSegments(path)
 
           list.add(
             VideoItem(
@@ -430,6 +504,7 @@ object HomeScreen : Screen {
               uri = uri,
               resolution = resolution,
               dateAdded = date,
+              segments = segments,
             ),
           )
         }
@@ -440,34 +515,38 @@ object HomeScreen : Screen {
     return list
   }
 
-  private fun groupIntoFolders(videos: List<VideoItem>): List<FolderGroup> {
-    val map = mutableMapOf<String, MutableList<VideoItem>>()
-    for (v in videos) {
-      val parent = File(v.path).parent ?: "Internal Storage"
-      val group = map.getOrPut(parent) { mutableListOf() }
-      group.add(v)
-    }
-    return map.map { (path, vids) ->
-      FolderGroup(
-        name = File(path).name.ifEmpty { "Videos" },
-        path = path,
-        videos = vids,
-      )
-    }.sortedBy { it.name.lowercase(Locale.ROOT) }
+  private fun getRelativeDirSegments(filePath: String): List<String> {
+    val file = File(filePath)
+    val parent = file.parentFile ?: return emptyList()
+    val parentPath = parent.absolutePath.replace('\\', '/')
+
+    val cleanPath = when {
+      parentPath.startsWith("/storage/emulated/0") -> parentPath.removePrefix("/storage/emulated/0")
+      parentPath.startsWith("/sdcard") -> parentPath.removePrefix("/sdcard")
+      parentPath.startsWith("/storage/") -> {
+        val afterStorage = parentPath.removePrefix("/storage/")
+        val slashIdx = afterStorage.indexOf('/')
+        if (slashIdx >= 0) afterStorage.substring(slashIdx) else ""
+      }
+      else -> parentPath
+    }.trim('/')
+
+    if (cleanPath.isEmpty()) return emptyList()
+    return cleanPath.split('/').filter { it.isNotBlank() }
   }
 }
 
 @Composable
 fun FolderRowItem(
-  folder: FolderGroup,
+  folder: SubFolderInfo,
   onClick: () -> Unit,
 ) {
   Card(
     modifier = Modifier
       .fillMaxWidth()
-      .padding(horizontal = 14.dp, vertical = 5.dp)
+      .padding(horizontal = 14.dp, vertical = 4.dp)
       .clickable(onClick = onClick),
-    shape = RoundedCornerShape(14.dp),
+    shape = RoundedCornerShape(12.dp),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
     ),
@@ -475,51 +554,56 @@ fun FolderRowItem(
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(14.dp),
+        .padding(horizontal = 14.dp, vertical = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      // Folder icon with red badge count
-      BadgedBox(
-        badge = {
-          val count = folder.videos.size
-          Badge(
-            containerColor = Color(0xFFFF3B30),
-            contentColor = Color.White,
-          ) {
-            Text(if (count > 99) "99+" else count.toString(), fontWeight = FontWeight.Bold, fontSize = 10.sp)
-          }
-        },
+      Box(
+        contentAlignment = Alignment.TopEnd,
       ) {
         Icon(
           Icons.Default.Folder,
           contentDescription = null,
-          modifier = Modifier.size(44.dp),
+          modifier = Modifier.size(36.dp),
           tint = MaterialTheme.colorScheme.primary,
         )
+        if (folder.videoCount > 0) {
+          Surface(
+            shape = CircleShape,
+            color = Color(0xFFFF3B30),
+            modifier = Modifier.offset(x = 6.dp, y = (-3).dp),
+          ) {
+            Text(
+              text = if (folder.videoCount > 99) "99+" else folder.videoCount.toString(),
+              color = Color.White,
+              fontWeight = FontWeight.Bold,
+              fontSize = 9.sp,
+              modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+            )
+          }
+        }
       }
 
-      Spacer(modifier = Modifier.width(16.dp))
+      Spacer(modifier = Modifier.width(14.dp))
 
       Column(modifier = Modifier.weight(1f)) {
         Text(
           text = folder.name,
-          fontWeight = FontWeight.Bold,
-          fontSize = 16.sp,
+          fontWeight = FontWeight.SemiBold,
+          fontSize = 15.sp,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
-        Spacer(modifier = Modifier.height(2.dp))
         Text(
-          text = "${folder.videos.size} videos",
+          text = "${folder.videoCount} videos",
           fontSize = 12.sp,
-          color = MaterialTheme.colorScheme.primary,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
 
       Icon(
-        Icons.Default.PlayArrow,
+        Icons.Default.ChevronRight,
         contentDescription = null,
-        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
         modifier = Modifier.size(20.dp),
       )
     }
@@ -527,66 +611,63 @@ fun FolderRowItem(
 }
 
 @Composable
-fun FolderCardGrid(
-  folder: FolderGroup,
+fun CompactFolderGridCard(
+  folder: SubFolderInfo,
   onClick: () -> Unit,
 ) {
   Card(
     modifier = Modifier
       .fillMaxWidth()
-      .aspectRatio(1.1f)
+      .height(98.dp)
       .clickable(onClick = onClick),
-    shape = RoundedCornerShape(16.dp),
+    shape = RoundedCornerShape(12.dp),
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+      containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
     ),
   ) {
     Column(
       modifier = Modifier
         .fillMaxSize()
-        .padding(14.dp),
-      verticalArrangement = Arrangement.SpaceBetween,
+        .padding(6.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center,
     ) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
+      Box(
+        contentAlignment = Alignment.TopEnd,
+        modifier = Modifier.padding(bottom = 4.dp),
       ) {
         Icon(
           Icons.Default.Folder,
           contentDescription = null,
-          modifier = Modifier.size(42.dp),
+          modifier = Modifier.size(34.dp),
           tint = MaterialTheme.colorScheme.primary,
         )
-        Surface(
-          shape = CircleShape,
-          color = Color(0xFFFF3B30),
-          modifier = Modifier.padding(2.dp),
-        ) {
-          Text(
-            text = if (folder.videos.size > 99) "99+" else folder.videos.size.toString(),
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-          )
+        if (folder.videoCount > 0) {
+          Surface(
+            shape = CircleShape,
+            color = Color(0xFFFF3B30),
+            modifier = Modifier.offset(x = 6.dp, y = (-3).dp),
+          ) {
+            Text(
+              text = if (folder.videoCount > 99) "99+" else folder.videoCount.toString(),
+              color = Color.White,
+              fontWeight = FontWeight.Bold,
+              fontSize = 9.sp,
+              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+            )
+          }
         }
       }
 
-      Column {
-        Text(
-          text = folder.name,
-          fontWeight = FontWeight.Bold,
-          fontSize = 15.sp,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-          text = "${folder.videos.size} videos",
-          fontSize = 12.sp,
-          color = MaterialTheme.colorScheme.primary,
-        )
-      }
+      Text(
+        text = folder.name,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
+      )
     }
   }
 }
@@ -599,11 +680,11 @@ fun VideoRowItem(
   Card(
     modifier = Modifier
       .fillMaxWidth()
-      .padding(horizontal = 14.dp, vertical = 5.dp)
+      .padding(horizontal = 14.dp, vertical = 4.dp)
       .clickable(onClick = onClick),
-    shape = RoundedCornerShape(14.dp),
+    shape = RoundedCornerShape(12.dp),
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+      containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
     ),
   ) {
     Row(
@@ -612,62 +693,61 @@ fun VideoRowItem(
         .padding(10.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      // Thumbnail Box with Duration Badge
       Box(
         modifier = Modifier
-          .size(width = 96.dp, height = 64.dp)
-          .clip(RoundedCornerShape(8.dp))
-          .background(MaterialTheme.colorScheme.surface),
+          .size(68.dp, 44.dp)
+          .clip(RoundedCornerShape(6.dp))
+          .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         contentAlignment = Alignment.Center,
       ) {
         Icon(
           Icons.Default.PlayArrow,
           contentDescription = null,
           tint = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.size(28.dp),
+          modifier = Modifier.size(22.dp),
         )
         Surface(
+          shape = RoundedCornerShape(3.dp),
           color = Color.Black.copy(alpha = 0.75f),
-          shape = RoundedCornerShape(4.dp),
           modifier = Modifier
             .align(Alignment.BottomEnd)
-            .padding(4.dp),
+            .padding(2.dp),
         ) {
           Text(
             text = video.formatDuration(),
             color = Color.White,
-            fontSize = 10.sp,
+            fontSize = 9.sp,
             fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
           )
         }
       }
 
-      Spacer(modifier = Modifier.width(14.dp))
+      Spacer(modifier = Modifier.width(12.dp))
 
       Column(modifier = Modifier.weight(1f)) {
         Text(
           text = video.title,
-          fontWeight = FontWeight.Bold,
-          fontSize = 15.sp,
-          maxLines = 2,
+          fontWeight = FontWeight.SemiBold,
+          fontSize = 14.sp,
+          maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
           Surface(
+            shape = RoundedCornerShape(3.dp),
             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-            shape = RoundedCornerShape(4.dp),
           ) {
             Text(
               text = video.resolution,
               color = MaterialTheme.colorScheme.primary,
               fontSize = 10.sp,
               fontWeight = FontWeight.Bold,
-              modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
             )
           }
-          Spacer(modifier = Modifier.width(8.dp))
+          Spacer(modifier = Modifier.width(6.dp))
           Text(
             text = video.formatSize(),
             fontSize = 11.sp,
@@ -680,72 +760,72 @@ fun VideoRowItem(
 }
 
 @Composable
-fun VideoCardGrid(
+fun CompactVideoGridCard(
   video: VideoItem,
   onClick: () -> Unit,
 ) {
   Card(
     modifier = Modifier
       .fillMaxWidth()
+      .height(130.dp)
       .clickable(onClick = onClick),
-    shape = RoundedCornerShape(14.dp),
+    shape = RoundedCornerShape(10.dp),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
     ),
   ) {
-    Column {
+    Column(modifier = Modifier.fillMaxSize()) {
       Box(
         modifier = Modifier
           .fillMaxWidth()
-          .aspectRatio(16f / 9f)
-          .background(MaterialTheme.colorScheme.surface),
+          .height(76.dp)
+          .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         contentAlignment = Alignment.Center,
       ) {
         Icon(
           Icons.Default.PlayArrow,
           contentDescription = null,
-          tint = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.size(36.dp),
+          tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+          modifier = Modifier.size(28.dp),
         )
         Surface(
+          shape = RoundedCornerShape(3.dp),
           color = Color.Black.copy(alpha = 0.75f),
-          shape = RoundedCornerShape(4.dp),
           modifier = Modifier
             .align(Alignment.BottomEnd)
-            .padding(6.dp),
+            .padding(3.dp),
         ) {
           Text(
             text = video.formatDuration(),
             color = Color.White,
-            fontSize = 10.sp,
+            fontSize = 9.sp,
             fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
           )
         }
       }
 
-      Column(modifier = Modifier.padding(10.dp)) {
+      Column(modifier = Modifier.padding(6.dp)) {
         Text(
           text = video.title,
-          fontWeight = FontWeight.Bold,
-          fontSize = 14.sp,
+          fontWeight = FontWeight.Medium,
+          fontSize = 11.sp,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
-        Spacer(modifier = Modifier.height(2.dp))
         Row(
-          modifier = Modifier.fillMaxWidth(),
+          modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
           horizontalArrangement = Arrangement.SpaceBetween,
         ) {
           Text(
             text = video.resolution,
             color = MaterialTheme.colorScheme.primary,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
           )
           Text(
             text = video.formatSize(),
-            fontSize = 11.sp,
+            fontSize = 9.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
         }

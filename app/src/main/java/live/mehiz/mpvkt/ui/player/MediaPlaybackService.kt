@@ -358,6 +358,8 @@ class MediaPlaybackService : MediaBrowserServiceCompat() {
 
   private fun setupSubtitlesOptions() {
     mpv.setOptionString("slang", subtitlesPreferences.preferredLanguages.get())
+    mpv.setOptionString("sub-auto", "fuzzy")
+    mpv.setOptionString("sub-file-paths", "sub:subs:subtitles")
 
     mpv.setOptionString("sub-fonts-dir", cacheDir.path + "/fonts/")
     mpv.setOptionString("sub-delay", (subtitlesPreferences.defaultSubDelay.get() / 1000.0).toString())
@@ -479,7 +481,7 @@ class MediaPlaybackService : MediaBrowserServiceCompat() {
       }
     }
 
-    else -> intent.getStringExtra("uri")
+    else -> intent.data?.resolveUri(this) ?: intent.getStringExtra("uri")
   }
 
   private fun getFileName(intent: Intent): String {
