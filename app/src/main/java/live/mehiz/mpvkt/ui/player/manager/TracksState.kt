@@ -75,6 +75,10 @@ class TracksState(private val mpv: MPV, private val context: Context, json: Json
     mpv.prop("aid", false)
   }
 
+  fun setSwAudioDecoder(enabled: Boolean) {
+    mpv.setPropertyString("ad", if (enabled) "lavc:*" else "all")
+  }
+
   fun addSubtitle(uri: Uri) {
     manuallyDisabled = false
     val path = when (uri.scheme) {

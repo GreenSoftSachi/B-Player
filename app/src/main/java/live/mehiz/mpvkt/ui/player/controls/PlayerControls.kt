@@ -713,7 +713,7 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
         useSwAudioDecoder = useSwAudioDecoder,
         onToggleSwAudioDecoder = { enabled ->
           audioPreferences.useSwAudioDecoder.set(enabled)
-          playerManager.tracks.mpv.setPropertyString("ad", if (enabled) "lavc:*" else "all")
+          playerManager.tracks.setSwAudioDecoder(enabled)
         },
         onSelectTrack = { track ->
           playerManager.tracks.selectAudio(track.id)
