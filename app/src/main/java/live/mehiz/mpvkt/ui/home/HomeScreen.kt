@@ -558,18 +558,20 @@ fun FolderRowItem(
         tint = MaterialTheme.colorScheme.primary,
       )
       if (folder.videoCount > 0) {
-        Surface(
-          shape = RoundedCornerShape(10.dp),
-          color = Color(0xFFFF2A2A),
-          border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
-          modifier = Modifier.offset(x = 8.dp, y = (-4).dp),
+        Box(
+          modifier = Modifier
+            .offset(x = 6.dp, y = (-4).dp)
+            .size(20.dp)
+            .clip(CircleShape)
+            .background(Color(0xFFFF2A2A)),
+          contentAlignment = Alignment.Center,
         ) {
           Text(
-            text = if (folder.videoCount > 99) " 99+ " else " ${folder.videoCount} ",
+            text = if (folder.videoCount > 99) "99+" else folder.videoCount.toString(),
             color = Color.White,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             fontSize = 9.sp,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+            textAlign = TextAlign.Center,
           )
         }
       }
@@ -634,18 +636,20 @@ fun CompactFolderGridCard(
           tint = MaterialTheme.colorScheme.primary,
         )
         if (folder.videoCount > 0) {
-          Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = Color(0xFFFF2A2A),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
-            modifier = Modifier.offset(x = 8.dp, y = (-4).dp),
+          Box(
+            modifier = Modifier
+              .offset(x = 6.dp, y = (-4).dp)
+              .size(20.dp)
+              .clip(CircleShape)
+              .background(Color(0xFFFF2A2A)),
+            contentAlignment = Alignment.Center,
           ) {
             Text(
-              text = if (folder.videoCount > 99) " 99+ " else " ${folder.videoCount} ",
+              text = if (folder.videoCount > 99) "99+" else folder.videoCount.toString(),
               color = Color.White,
-              fontWeight = FontWeight.ExtraBold,
+              fontWeight = FontWeight.Bold,
               fontSize = 9.sp,
-              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+              textAlign = TextAlign.Center,
             )
           }
         }

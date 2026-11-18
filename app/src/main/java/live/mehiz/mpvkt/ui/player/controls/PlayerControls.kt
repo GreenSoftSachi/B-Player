@@ -356,29 +356,22 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
             gestureSeekAmount != null -> {
               val seekDiff = gestureSeekAmount!!.second
               val targetPos = gestureSeekAmount!!.first + seekDiff
-              Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color.Black.copy(alpha = 0.75f),
-                border = BorderStroke(1.dp, Color(0x6600E5FF)),
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
               ) {
-                Row(
-                  verticalAlignment = Alignment.CenterVertically,
-                  horizontalArrangement = Arrangement.spacedBy(8.dp),
-                  modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                ) {
-                  Text(
-                    text = "${if (seekDiff >= 0) "+" else "-"}${Utils.prettyTime(abs(seekDiff))}",
-                    color = Color(0xFF00E5FF),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                  )
-                  Text(
-                    text = "(${Utils.prettyTime(targetPos)})",
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp,
-                  )
-                }
+                Text(
+                  text = "${if (seekDiff >= 0) "+" else "-"}${Utils.prettyTime(abs(seekDiff))}",
+                  color = Color(0xFF00E5FF),
+                  fontWeight = FontWeight.Bold,
+                  fontSize = 14.sp,
+                )
+                Text(
+                  text = "(${Utils.prettyTime(targetPos)})",
+                  color = Color.White,
+                  fontWeight = FontWeight.Medium,
+                  fontSize = 12.sp,
+                )
               }
             }
 
