@@ -466,7 +466,7 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
           val showChaptersButton by playerPreferences.showChaptersButton.collectAsState()
           TopRightPlayerControls(
             decoder = decoder,
-            onDecoderClick = playerManager.video::cycleDecoder,
+            onDecoderClick = { onOpenSheet(Sheets.Decoders) },
             onDecoderLongClick = { onOpenSheet(Sheets.Decoders) },
             isChaptersVisible = showChaptersButton && chapters.isNotEmpty(),
             onChaptersClick = { onOpenSheet(Sheets.Chapters) },
@@ -549,8 +549,8 @@ fun PlayerControls(viewModel: PlayerViewModel, onBackPress: () -> Unit, modifier
           val showChapterIndicator by playerPreferences.currentChaptersIndicator.collectAsState()
           BottomLeftPlayerControls(
             playbackSpeed = playbackSpeed,
-            showChapterIndicator = showChapterIndicator,
-            currentChapter = chapters.getOrNull(currentChapter),
+            showChapterIndicator = false,
+            currentChapter = null,
             onLockControls = viewModel::lockControls,
             onCycleRotation = viewModel::cycleScreenRotations,
             onPlaybackSpeedChange = {

@@ -541,72 +541,62 @@ fun FolderRowItem(
   folder: SubFolderInfo,
   onClick: () -> Unit,
 ) {
-  Card(
+  Row(
     modifier = Modifier
       .fillMaxWidth()
-      .padding(horizontal = 14.dp, vertical = 4.dp)
-      .clickable(onClick = onClick),
-    shape = RoundedCornerShape(12.dp),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-    ),
+      .clickable(onClick = onClick)
+      .padding(horizontal = 20.dp, vertical = 12.dp),
+    verticalAlignment = Alignment.CenterVertically,
   ) {
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = 14.dp, vertical = 12.dp),
-      verticalAlignment = Alignment.CenterVertically,
+    Box(
+      contentAlignment = Alignment.TopEnd,
     ) {
-      Box(
-        contentAlignment = Alignment.TopEnd,
-      ) {
-        Icon(
-          Icons.Default.Folder,
-          contentDescription = null,
-          modifier = Modifier.size(36.dp),
-          tint = MaterialTheme.colorScheme.primary,
-        )
-        if (folder.videoCount > 0) {
-          Surface(
-            shape = CircleShape,
-            color = Color(0xFFFF3B30),
-            modifier = Modifier.offset(x = 6.dp, y = (-3).dp),
-          ) {
-            Text(
-              text = if (folder.videoCount > 99) "99+" else folder.videoCount.toString(),
-              color = Color.White,
-              fontWeight = FontWeight.Bold,
-              fontSize = 9.sp,
-              modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-            )
-          }
+      Icon(
+        Icons.Default.Folder,
+        contentDescription = null,
+        modifier = Modifier.size(38.dp),
+        tint = MaterialTheme.colorScheme.primary,
+      )
+      if (folder.videoCount > 0) {
+        Surface(
+          shape = CircleShape,
+          color = Color(0xFFFF3B30),
+          modifier = Modifier.offset(x = 6.dp, y = (-3).dp),
+        ) {
+          Text(
+            text = if (folder.videoCount > 99) "99+" else folder.videoCount.toString(),
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 9.sp,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+          )
         }
       }
+    }
 
-      Spacer(modifier = Modifier.width(14.dp))
+    Spacer(modifier = Modifier.width(16.dp))
 
-      Column(modifier = Modifier.weight(1f)) {
-        Text(
-          text = folder.name,
-          fontWeight = FontWeight.SemiBold,
-          fontSize = 15.sp,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-          text = "${folder.videoCount} videos",
-          fontSize = 12.sp,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      }
-
-      Icon(
-        Icons.Default.ChevronRight,
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-        modifier = Modifier.size(20.dp),
+    Column(modifier = Modifier.weight(1f)) {
+      Text(
+        text = folder.name,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 15.sp,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+      Text(
+        text = "${folder.videoCount} videos",
+        fontSize = 12.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
     }
+
+    Icon(
+      Icons.Default.ChevronRight,
+      contentDescription = null,
+      tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+      modifier = Modifier.size(20.dp),
+    )
   }
 }
 
@@ -677,83 +667,73 @@ fun VideoRowItem(
   video: VideoItem,
   onClick: () -> Unit,
 ) {
-  Card(
+  Row(
     modifier = Modifier
       .fillMaxWidth()
-      .padding(horizontal = 14.dp, vertical = 4.dp)
-      .clickable(onClick = onClick),
-    shape = RoundedCornerShape(12.dp),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-    ),
+      .clickable(onClick = onClick)
+      .padding(horizontal = 20.dp, vertical = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
   ) {
-    Row(
+    Box(
       modifier = Modifier
-        .fillMaxWidth()
-        .padding(10.dp),
-      verticalAlignment = Alignment.CenterVertically,
+        .size(68.dp, 44.dp)
+        .clip(RoundedCornerShape(6.dp))
+        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+      contentAlignment = Alignment.Center,
     ) {
-      Box(
+      Icon(
+        Icons.Default.PlayArrow,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.size(22.dp),
+      )
+      Surface(
+        shape = RoundedCornerShape(3.dp),
+        color = Color.Black.copy(alpha = 0.75f),
         modifier = Modifier
-          .size(68.dp, 44.dp)
-          .clip(RoundedCornerShape(6.dp))
-          .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-        contentAlignment = Alignment.Center,
+          .align(Alignment.BottomEnd)
+          .padding(2.dp),
       ) {
-        Icon(
-          Icons.Default.PlayArrow,
-          contentDescription = null,
-          tint = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.size(22.dp),
+        Text(
+          text = video.formatDuration(),
+          color = Color.White,
+          fontSize = 9.sp,
+          fontFamily = FontFamily.Monospace,
+          modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
         )
+      }
+    }
+
+    Spacer(modifier = Modifier.width(16.dp))
+
+    Column(modifier = Modifier.weight(1f)) {
+      Text(
+        text = video.title,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+      Spacer(modifier = Modifier.height(2.dp))
+      Row(verticalAlignment = Alignment.CenterVertically) {
         Surface(
           shape = RoundedCornerShape(3.dp),
-          color = Color.Black.copy(alpha = 0.75f),
-          modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .padding(2.dp),
+          color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
         ) {
           Text(
-            text = video.formatDuration(),
-            color = Color.White,
-            fontSize = 9.sp,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
+            text = video.resolution,
+            color = MaterialTheme.colorScheme.primary,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
           )
         }
-      }
-
-      Spacer(modifier = Modifier.width(12.dp))
-
-      Column(modifier = Modifier.weight(1f)) {
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
-          text = video.title,
-          fontWeight = FontWeight.SemiBold,
-          fontSize = 14.sp,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
+          text = video.formatSize(),
+          fontSize = 11.sp,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(2.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          Surface(
-            shape = RoundedCornerShape(3.dp),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-          ) {
-            Text(
-              text = video.resolution,
-              color = MaterialTheme.colorScheme.primary,
-              fontSize = 10.sp,
-              fontWeight = FontWeight.Bold,
-              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-            )
-          }
-          Spacer(modifier = Modifier.width(6.dp))
-          Text(
-            text = video.formatSize(),
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
       }
     }
   }

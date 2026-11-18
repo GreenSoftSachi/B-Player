@@ -100,4 +100,23 @@ class VideoSettings(
     mpv.prop("video-aspect-override", ratio)
     playerPreferences.videoAspect.set(aspect)
   }
+
+  fun zoomBy(zoomFactor: Float) {
+    val currentZoom = mpv.getPropertyDouble("video-zoom") ?: 0.0
+    val newZoom = (currentZoom + (zoomFactor - 1.0) * 1.5).coerceIn(0.0, 3.0)
+    mpv.setPropertyDouble("video-zoom", newZoom)
+  }
+
+  fun panBy(dx: Float, dy: Float) {
+    val currentPanX = mpv.getPropertyDouble("video-pan-x") ?: 0.0
+    val currentPanY = mpv.getPropertyDouble("video-pan-y") ?: 0.0
+    mpv.setPropertyDouble("video-pan-x", currentPanX + dx * 0.001)
+    mpv.setPropertyDouble("video-pan-y", currentPanY + dy * 0.001)
+  }
+
+  fun resetZoomAndPan() {
+    mpv.setPropertyDouble("video-zoom", 0.0)
+    mpv.setPropertyDouble("video-pan-x", 0.0)
+    mpv.setPropertyDouble("video-pan-y", 0.0)
+  }
 }

@@ -28,14 +28,13 @@ class TracksState(private val mpv: MPV, private val context: Context, json: Json
 
   fun selectSubtitle(id: Int) {
     val sid = mpv.getPropertyInt("sid")
-    val secondarySid = mpv.getPropertyInt("secondary-sid")
-    val (primary, secondary) = when (id) {
-      sid -> secondarySid to null
-      secondarySid -> sid to null
-      else -> if (sid != null) sid to id else id to null
+    if (id == sid) {
+      mpv.prop("sid", false)
+    } else {
+      mpv.prop("sid", id)
     }
-    primary?.let { mpv.prop("sid", it) } ?: mpv.prop("sid", false)
-    secondary?.let { mpv.prop("secondary-sid", it) } ?: mpv.prop("secondary-sid", false)
+    // Always disable secondary-sid so subtitles are never duplicated at the top
+    mpv.prop("secondary-sid", false)
   }
 
   fun toggleAudio(id: Int) {

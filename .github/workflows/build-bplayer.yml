@@ -36,31 +36,35 @@ jobs:
         run: |
           mkdir -p release-apks
           # Package the single best 64-bit APK for Android 10+ devices
-          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.1.1.apk
+          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.1.2.apk
           ls -la release-apks/
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: B-Player-v1.1.1-APK
+          name: B-Player-v1.1.2-APK
           path: release-apks/
           retention-days: 30
 
-      - name: Create GitHub Release v1.1.1
+      - name: Create GitHub Release v1.1.2
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.1
-          name: "B-Player v1.1.1 (Hierarchical Folders, Compact Grid & Subtitles)"
+          tag_name: v1.1.2
+          name: "B-Player v1.1.2 (Pinch-to-Zoom, Rotate Fix, Clean Folders, Decoders Menu & Cyan Sliders)"
           body: |
-            ## 👑 B-Player v1.1.1 - Ultimate Release (Single Android 10+ APK)
+            ## 👑 B-Player v1.1.2 - Modern MX Edition (Single APK for Android 10+)
             
-            ### 🌟 What's New in v1.1.1:
-            * 🎬 **Instant Video Playback**: Fixed Intent action (`ACTION_VIEW`) so all videos open and play instantly when tapped!
-            * 📁 **Hierarchical Folders Navigation**: True folder structure (TV -> Films -> Videos) with iconic red badges!
-            * 📱 **Compact Modern Grid**: App-icon sized compact tiles (columns adaptive 5-10 on tablets) replacing giant boxes!
-            * 💬 **Auto-Load Subtitles**: External (.srt, .ass, .vtt) and internal subtitle tracks load automatically!
-            * 📦 **Single APK**: Exactly one clean, lightweight 78MB APK (`B-Player-v1.1.1.apk`) for all Android 10+ devices!
-          files: release-apks/B-Player-v1.1.1.apk
+            ### 🌟 What's New in v1.1.2:
+            * 🔄 **Force Screen Rotation**: Instant Landscape ↔ Portrait rotation button toggle without getting stuck on sensor lock!
+            * 🤏 **Pinch-to-Zoom & Pan**: Full 2-finger video zoom (up to 300%) and pan, double-tap to reset!
+            * 🔤 **2-Finger Subtitle Resize**: Pinch on the subtitle zone to smoothly adjust subtitle font size on the fly!
+            * 🔊 **Vibrant Cyan Slider**: Clean bright cyan volume slider matching brightness!
+            * 📂 **Clean & Flat Folders**: Removed bulky dark card boxes from folder list for a free, spacious, MX Player-style list view!
+            * 💬 **Single Bottom Subtitle**: Fixed secondary subtitle duplicate so subtitles only display once at the bottom!
+            * ⚡ **Decoders Menu**: Tap the decoder button to open a clean sheet with Auto, HW+, HW, and SW options!
+            * 🚫 **Clean Bottom Bar**: Removed Chapter badge from bottom bar.
+            * 📦 **Single APK**: Exactly one clean, lightweight ~78MB APK (`B-Player-v1.1.2.apk`)!
+          files: release-apks/B-Player-v1.1.2.apk
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

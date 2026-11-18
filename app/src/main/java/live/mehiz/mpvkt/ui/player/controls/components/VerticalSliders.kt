@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import live.mehiz.mpvkt.R
@@ -61,7 +62,7 @@ fun VerticalSlider(
       Modifier
         .fillMaxWidth()
         .fillMaxHeight(targetHeight)
-        .background(MaterialTheme.colorScheme.tertiary),
+        .background(Color(0xFF00E5FF)),
     )
     if (overflowRange != null && overflowValue != null) {
       val overflowHeight by animateFloatAsState(
@@ -72,7 +73,7 @@ fun VerticalSlider(
         Modifier
           .fillMaxWidth()
           .fillMaxHeight(overflowHeight)
-          .background(MaterialTheme.colorScheme.errorContainer),
+          .background(Color(0xFFFF9100)),
       )
     }
   }
@@ -100,7 +101,7 @@ fun VerticalSlider(
       Modifier
         .fillMaxWidth()
         .fillMaxHeight(targetHeight)
-        .background(MaterialTheme.colorScheme.tertiary),
+        .background(Color(0xFF00E5FF)),
     )
     if (overflowRange != null && overflowValue != null) {
       val overflowHeight by animateFloatAsState(
@@ -111,7 +112,7 @@ fun VerticalSlider(
         Modifier
           .fillMaxWidth()
           .fillMaxHeight(overflowHeight)
-          .background(MaterialTheme.colorScheme.errorContainer),
+          .background(Color(0xFFFF9100)),
       )
     }
   }

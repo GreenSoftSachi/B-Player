@@ -235,19 +235,13 @@ class PlayerActivity : AppCompatActivity() {
   }
 
   private fun cycleScreenRotations() {
-    requestedOrientation = when (requestedOrientation) {
-      ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE,
-      ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE,
-      ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,
-      -> {
-        playerPreferences.orientation.set(PlayerOrientation.SensorPortrait)
-        ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-      }
-
-      else -> {
-        playerPreferences.orientation.set(PlayerOrientation.SensorLandscape)
-        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-      }
+    val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    if (isLandscape) {
+      requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+      playerPreferences.orientation.set(PlayerOrientation.Portrait)
+    } else {
+      requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+      playerPreferences.orientation.set(PlayerOrientation.Landscape)
     }
   }
 
@@ -452,7 +446,7 @@ class PlayerActivity : AppCompatActivity() {
 
       PlayerOrientation.Landscape -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
 
-      PlayerOrientation.ReverseLandscape -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+      PlayerOrientation.ReverseLandscape -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
 
       PlayerOrientation.SensorLandscape -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     }

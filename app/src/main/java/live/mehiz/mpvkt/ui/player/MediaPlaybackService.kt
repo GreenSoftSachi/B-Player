@@ -515,6 +515,7 @@ class MediaPlaybackService : MediaBrowserServiceCompat() {
     mpv.setPropertyInt("time-pos", extras.getInt("position", 0) / 1000)
 
     if (extras.containsKey("subs")) {
+      mpv.setPropertyString("secondary-sid", "no")
       val subList = Utils.getParcelableArray<Uri>(extras, "subs")
       val subsToEnable = Utils.getParcelableArray<Uri>(extras, "subs.enable")
 
