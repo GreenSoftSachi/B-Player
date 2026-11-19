@@ -1,6 +1,7 @@
 package live.mehiz.mpvkt.ui.home
 
 import android.Manifest
+import android.app.usage.StorageStatsManager
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
@@ -9,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
+import android.os.storage.StorageManager
 import android.media.MediaScannerConnection
 import android.provider.MediaStore
 import android.util.Size
@@ -115,6 +117,7 @@ import live.mehiz.mpvkt.ui.preferences.PreferencesScreen
 import live.mehiz.mpvkt.ui.utils.LocalBackStack
 import java.io.File
 import java.util.Locale
+import java.util.UUID
 
 data class VideoItem(
   val id: Long,
@@ -285,13 +288,27 @@ object HomeScreen : Screen {
         .filter { it.segments.size > depth }
         .groupBy { it.segments[depth] }
 
-      groups.map { (subName, vids) ->
+      val list = groups.map { (subName, vids) ->
         SubFolderInfo(
           name = subName,
           fullPathList = currentPath + subName,
           videoCount = vids.size,
         )
-      }.sortedBy { it.name.lowercase(Locale.ROOT) }
+      }.toMutableList()
+
+      if (currentPath.isEmpty()) {
+        if (list.none { it.name == "Internal Storage" }) {
+          list.add(0, SubFolderInfo("Internal Storage", listOf("Internal Storage"), 0))
+        }
+        val hasSd = getSdCardRoot(context) != null || allVideos.any { it.segments.firstOrNull() == "SD Card" }
+        if (hasSd && list.none { it.name == "SD Card" }) {
+          list.add(SubFolderInfo("SD Card", listOf("SD Card"), 0))
+        }
+        list.sortBy { if (it.name == "Internal Storage") 0 else 1 }
+      } else {
+        list.sortBy { it.name.lowercase(Locale.ROOT) }
+      }
+      list
     }
 
     val visibleDirectVideos = remember(matchingVideos, currentPath, isFoldersMode, allVideos) {
@@ -369,7 +386,7 @@ object HomeScreen : Screen {
                         return@launch
                       }
 
-                      val targetDir = resolveRealDirectory(currentPath)
+                      val targetDir = resolveRealDirectory(context, currentPath)
                       if (!targetDir.exists()) targetDir.mkdirs()
 
                       var dest = File(targetDir, src.name)
@@ -576,7 +593,7 @@ object HomeScreen : Screen {
               clipboardIsFolder = false
               clipboardName = selectedVideoForAction!!.title
             } else if (selectedFolderForAction != null) {
-              val targetDir = resolveRealDirectory(selectedFolderForAction!!.fullPathList)
+              val targetDir = resolveRealDirectory(context, selectedFolderForAction!!.fullPathList)
               clipboardPath = targetDir.absolutePath
               clipboardIsFolder = true
               clipboardName = selectedFolderForAction!!.name
@@ -598,7 +615,7 @@ object HomeScreen : Screen {
 
       if (isDeleteDialogOpen) {
         val itemName = selectedVideoForAction?.title ?: selectedFolderForAction?.name ?: ""
-        val itemPath = selectedVideoForAction?.path ?: resolveRealDirectory(selectedFolderForAction?.fullPathList ?: emptyList()).absolutePath
+        val itemPath = selectedVideoForAction?.path ?: resolveRealDirectory(context, selectedFolderForAction?.fullPathList ?: emptyList()).absolutePath
 
         DeleteConfirmDialog(
           title = itemName,
@@ -882,18 +899,14 @@ object HomeScreen : Screen {
     return list
   }
 
-  private fun resolveRealDirectory(pathSegments: List<String>): File {
+  private fun resolveRealDirectory(context: Context, pathSegments: List<String>): File {
     if (pathSegments.isEmpty()) return Environment.getExternalStorageDirectory()
     val root = pathSegments.first()
     val subSegments = pathSegments.drop(1)
     val baseDir = if (root == "Internal Storage") {
       Environment.getExternalStorageDirectory()
     } else {
-      val storage = File("/storage")
-      val sdRoot = storage.listFiles()?.firstOrNull {
-        it.isDirectory && it.canRead() && !it.name.equals("emulated", true) && !it.name.equals("self", true)
-      } ?: Environment.getExternalStorageDirectory()
-      sdRoot
+      getSdCardRoot(context) ?: Environment.getExternalStorageDirectory()
     }
     var target = baseDir
     for (seg in subSegments) {
@@ -1277,12 +1290,134 @@ fun CompactVideoGridCard(
   }
 }
 
+fun getSdCardRoot(context: Context): File? {
+  // 1. Android R+ StorageManager.storageVolumes
+  val sm = context.getSystemService(Context.STORAGE_SERVICE) as? StorageManager
+  if (sm != null) {
+    val sdVol = sm.storageVolumes.firstOrNull { it.isRemovable }
+    if (sdVol != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      val dir = sdVol.directory
+      if (dir != null && dir.exists()) return dir
+    }
+  }
+
+  // 2. ContextCompat.getExternalFilesDirs
+  try {
+    val externalDirs = ContextCompat.getExternalFilesDirs(context, null)
+    for (dir in externalDirs) {
+      if (dir != null && Environment.isExternalStorageRemovable(dir)) {
+        var cur: File? = dir
+        while (cur != null && cur.parentFile != null && cur.parentFile!!.name != "storage") {
+          cur = cur.parentFile
+        }
+        if (cur != null && cur.exists()) {
+          return cur
+        }
+      }
+    }
+  } catch (_: Exception) {}
+
+  // 3. Scan /storage
+  try {
+    val storage = File("/storage")
+    val candidate = storage.listFiles()?.firstOrNull {
+      it.isDirectory && it.canRead() && !it.name.equals("emulated", true) && !it.name.equals("self", true)
+    }
+    if (candidate != null) return candidate
+  } catch (_: Exception) {}
+
+  return null
+}
+
+fun calculateDriveStorage(context: Context, isSdCard: Boolean): Pair<String, Float> {
+  var totalBytes = 0L
+  var freeBytes = 0L
+
+  if (!isSdCard) {
+    // 1. StorageStatsManager on Android 8+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      try {
+        val ssm = context.getSystemService(Context.STORAGE_STATS_SERVICE) as? StorageStatsManager
+        if (ssm != null) {
+          totalBytes = ssm.getTotalBytes(StorageManager.UUID_DEFAULT)
+          freeBytes = ssm.getFreeBytes(StorageManager.UUID_DEFAULT)
+        }
+      } catch (_: Exception) {}
+    }
+
+    // 2. StatFs on Environment.getExternalStorageDirectory()
+    if (totalBytes <= 0L) {
+      try {
+        val stat = StatFs(Environment.getExternalStorageDirectory().absolutePath)
+        totalBytes = stat.totalBytes
+        freeBytes = stat.availableBytes
+      } catch (_: Exception) {}
+    }
+
+    // 3. Fallback to data directory
+    if (totalBytes <= 0L) {
+      try {
+        val stat = StatFs(Environment.getDataDirectory().absolutePath)
+        totalBytes = stat.totalBytes
+        freeBytes = stat.availableBytes
+      } catch (_: Exception) {}
+    }
+  } else {
+    // SD Card (D:)
+    val sdRoot = getSdCardRoot(context)
+    if (sdRoot != null) {
+      try {
+        val stat = StatFs(sdRoot.absolutePath)
+        totalBytes = stat.totalBytes
+        freeBytes = stat.availableBytes
+      } catch (_: Exception) {}
+    }
+
+    // Fallback: Check storageVolumes UUID with StorageStatsManager
+    if (totalBytes <= 0L && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      try {
+        val sm = context.getSystemService(Context.STORAGE_SERVICE) as? StorageManager
+        val ssm = context.getSystemService(Context.STORAGE_STATS_SERVICE) as? StorageStatsManager
+        if (sm != null && ssm != null) {
+          val sdVol = sm.storageVolumes.firstOrNull { it.isRemovable }
+          val uuidStr = sdVol?.uuid
+          if (uuidStr != null) {
+            val uuid = UUID.fromString(uuidStr)
+            totalBytes = ssm.getTotalBytes(uuid)
+            freeBytes = ssm.getFreeBytes(uuid)
+          }
+        }
+      } catch (_: Exception) {}
+    }
+  }
+
+  if (totalBytes <= 0L) {
+    return Pair("0.0 GB free of 0.0 GB", 0f)
+  }
+
+  val totalGb = totalBytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
+  val freeGb = freeBytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
+  val usedBytes = (totalBytes - freeBytes).coerceAtLeast(0L)
+  val progress = (usedBytes.toDouble() / totalBytes.toDouble()).toFloat().coerceIn(0f, 1f)
+
+  val text = if (totalGb >= 1.0) {
+    String.format(Locale.US, "%.1f GB free of %.1f GB", freeGb, totalGb)
+  } else {
+    val totalMb = totalBytes.toDouble() / (1024.0 * 1024.0)
+    val freeMb = freeBytes.toDouble() / (1024.0 * 1024.0)
+    String.format(Locale.US, "%.0f MB free of %.0f MB", freeMb, totalMb)
+  }
+
+  return Pair(text, progress)
+}
+
 @Composable
 fun DriveCardItem(
   folder: SubFolderInfo,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  val context = LocalContext.current
   val isSdCard = folder.name.equals("SD Card", ignoreCase = true)
   val driveLetter = if (isSdCard) "D:" else "C:"
   val driveLabel = if (isSdCard) "SD Card ($driveLetter)" else "Internal Storage ($driveLetter)"
@@ -1290,27 +1425,7 @@ fun DriveCardItem(
   val borderColor = if (isSdCard) Color(0x5500E676) else Color(0x5500E5FF)
 
   val (storageText, progress) = remember(folder.name) {
-    try {
-      val path = if (!isSdCard) {
-        Environment.getDataDirectory().path
-      } else {
-        val storage = File("/storage")
-        val sd = storage.listFiles()?.firstOrNull {
-          it.isDirectory && it.canRead() && !it.name.equals("emulated", true) && !it.name.equals("self", true)
-        }
-        sd?.path ?: Environment.getExternalStorageDirectory().path
-      }
-      val stat = StatFs(path)
-      val totalBytes = stat.totalBytes
-      val freeBytes = stat.availableBytes
-      val usedBytes = totalBytes - freeBytes
-      val prog = if (totalBytes > 0) (usedBytes.toDouble() / totalBytes.toDouble()).toFloat() else 0.5f
-      val freeGb = freeBytes / (1024.0 * 1024.0 * 1024.0)
-      val totalGb = totalBytes / (1024.0 * 1024.0 * 1024.0)
-      Pair(String.format(Locale.US, "%.1f GB free of %.1f GB", freeGb, totalGb), prog.coerceIn(0f, 1f))
-    } catch (_: Exception) {
-      Pair("${folder.videoCount} videos", 0.5f)
-    }
+    calculateDriveStorage(context, isSdCard)
   }
 
   Card(
