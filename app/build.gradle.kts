@@ -24,8 +24,8 @@ android {
     applicationId = "com.greensoft.bplayer"
     minSdk = 24
     targetSdk = 36
-    versionCode = 17
-    versionName = "1.2.5"
+    versionCode = 18
+    versionName = "1.2.6"
 
     vectorDrawables {
       useSupportLibrary = true

@@ -36,29 +36,29 @@ jobs:
         run: |
           mkdir -p release-apks
           # Package the single best 64-bit APK for Android 10+ devices
-          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.2.5.apk
+          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.2.6.apk
           ls -la release-apks/
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: B-Player-v1.2.5-APK
+          name: B-Player-v1.2.6-APK
           path: release-apks/
           retention-days: 30
 
-      - name: Create GitHub Release v1.2.5
+      - name: Create GitHub Release v1.2.6
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.5
-          name: "B-Player v1.2.5 (Real Internal & SD Card Storage Capacity Calculation)"
+          tag_name: v1.2.6
+          name: "B-Player v1.2.6 (Home Screen Storage Drives Grid & List View Toggle Fix)"
           body: |
-            ## 👑 B-Player v1.2.5 - Storage Drives Calculation Fix
+            ## 👑 B-Player v1.2.6 - Home Screen Grid/List View Toggle Fix
 
-            ### 🌟 What's New in v1.2.5:
-            * 💽 **Accurate Internal & SD Card Capacity**: Integrated Android `StorageStatsManager`, `StorageManager.storageVolumes`, and `ContextCompat.getExternalFilesDirs` to display the exact real total size and free space (e.g. `XX.X GB free of XX.X GB`) for both Internal Storage (C:) and SD Card Chip (D:).
-            * 📁 **SD Card Discovery**: Automatically detects physical SD Cards and mounts them properly to the real file path instead of falling back to internal storage.
-            * 🛡️ **Full Storage Permissions**: Seamless "All Files Access" prompt for Android 11+ ensuring Copy, Paste, and Delete work without permission errors.
-          files: release-apks/B-Player-v1.2.5.apk
+            ### 🌟 What's New in v1.2.6:
+            * 🔲 **Home Screen Drives Grid & List View**: Tapping the top-right view button on the Home Screen (Drives view) now seamlessly toggles between full-width PC drive list items and 2-column cyber PC drive grid cards!
+            * 💽 **Real Internal & SD Card Capacity**: Exact storage space and free space display for internal storage and removable SD card chip.
+            * 🛡️ **All Files Access**: Smooth Scoped Storage permissions for copying, pasting, and deleting.
+          files: release-apks/B-Player-v1.2.6.apk
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -485,30 +485,48 @@ object HomeScreen : Screen {
           }
         } else if (isFoldersMode && currentPath.isEmpty()) {
           // PC-Style Storage Drives View ("This PC" style)
-          LazyColumn(
-            contentPadding = PaddingValues(vertical = 12.dp),
-            modifier = Modifier.fillMaxSize(),
-          ) {
-            item {
-              Row(
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-              ) {
-                Text(
-                  text = "Devices and drives",
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 13.sp,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+          // Responds to Grid / List toggle on Home Screen!
+          if (isGridView) {
+            LazyVerticalGrid(
+              columns = GridCells.Adaptive(minSize = 160.dp),
+              contentPadding = PaddingValues(12.dp),
+              verticalArrangement = Arrangement.spacedBy(12.dp),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+              modifier = Modifier.fillMaxSize(),
+            ) {
+              items(visibleSubFolders, key = { "drive_" + it.fullPathList.joinToString("/") }) { folder ->
+                DriveGridCardItem(
+                  folder = folder,
+                  onClick = { updatePath(folder.fullPathList) },
                 )
               }
             }
-            items(visibleSubFolders, key = { "drive_" + it.fullPathList.joinToString("/") }) { folder ->
-              DriveCardItem(
-                folder = folder,
-                onClick = { updatePath(folder.fullPathList) },
-              )
+          } else {
+            LazyColumn(
+              contentPadding = PaddingValues(vertical = 12.dp),
+              modifier = Modifier.fillMaxSize(),
+            ) {
+              item {
+                Row(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                  verticalAlignment = Alignment.CenterVertically,
+                ) {
+                  Text(
+                    text = "Devices and drives",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  )
+                }
+              }
+              items(visibleSubFolders, key = { "drive_" + it.fullPathList.joinToString("/") }) { folder ->
+                DriveCardItem(
+                  folder = folder,
+                  onClick = { updatePath(folder.fullPathList) },
+                )
+              }
             }
           }
         } else if (isGridView) {
@@ -1512,6 +1530,101 @@ fun DriveCardItem(
         contentDescription = null,
         tint = Color(0xFF8A99AD),
         modifier = Modifier.size(24.dp),
+      )
+    }
+  }
+}
+
+@Composable
+fun DriveGridCardItem(
+  folder: SubFolderInfo,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  val context = LocalContext.current
+  val isSdCard = folder.name.equals("SD Card", ignoreCase = true)
+  val driveLetter = if (isSdCard) "D:" else "C:"
+  val driveLabel = if (isSdCard) "SD Card ($driveLetter)" else "Internal Storage ($driveLetter)"
+  val driveTint = if (isSdCard) Color(0xFF00E676) else Color(0xFF00E5FF)
+  val borderColor = if (isSdCard) Color(0x5500E676) else Color(0x5500E5FF)
+
+  val (storageText, progress) = remember(folder.name) {
+    calculateDriveStorage(context, isSdCard)
+  }
+
+  Card(
+    modifier = modifier
+      .fillMaxWidth()
+      .clickable(onClick = onClick),
+    shape = RoundedCornerShape(14.dp),
+    colors = CardDefaults.cardColors(
+      containerColor = Color(0xDD0D1420),
+    ),
+    border = BorderStroke(1.5.dp, borderColor),
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(14.dp),
+    ) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Box(
+          modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(driveTint.copy(alpha = 0.15f)),
+          contentAlignment = Alignment.Center,
+        ) {
+          Icon(
+            if (isSdCard) Icons.Default.SdStorage else Icons.Default.Storage,
+            contentDescription = null,
+            modifier = Modifier.size(26.dp),
+            tint = driveTint,
+          )
+        }
+        Text(
+          text = "${folder.videoCount} videos",
+          fontWeight = FontWeight.SemiBold,
+          fontSize = 11.sp,
+          color = driveTint,
+        )
+      }
+
+      Spacer(modifier = Modifier.height(10.dp))
+
+      Text(
+        text = driveLabel,
+        fontWeight = FontWeight.Bold,
+        fontSize = 14.sp,
+        color = Color.White,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+
+      Spacer(modifier = Modifier.height(8.dp))
+
+      LinearProgressIndicator(
+        progress = { progress },
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(6.dp)
+          .clip(RoundedCornerShape(3.dp)),
+        color = driveTint,
+        trackColor = Color(0x33FFFFFF),
+      )
+
+      Spacer(modifier = Modifier.height(6.dp))
+
+      Text(
+        text = storageText,
+        fontSize = 10.sp,
+        color = Color(0xFF8A99AD),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
       )
     }
   }
