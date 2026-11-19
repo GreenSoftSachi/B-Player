@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.StatFs
 import android.media.MediaScannerConnection
 import android.provider.MediaStore
@@ -85,7 +86,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -166,12 +166,13 @@ object HomeScreen : Screen {
     val coroutineScope = rememberCoroutineScope()
 
     var allVideos by remember { mutableStateOf<List<VideoItem>>(emptyList()) }
-    var currentPath by rememberSaveable(
-      saver = listSaver(
-        save = { it },
-        restore = { it },
-      ),
-    ) { mutableStateOf<List<String>>(emptyList()) }
+    var currentPathSegments by rememberSaveable { mutableStateOf("") }
+    val currentPath = remember(currentPathSegments) {
+      if (currentPathSegments.isEmpty()) emptyList<String>() else currentPathSegments.split("|||")
+    }
+    val updatePath: (List<String>) -> Unit = { list ->
+      currentPathSegments = if (list.isEmpty()) "" else list.joinToString("|||")
+    }
     var isLoading by remember { mutableStateOf(true) }
     var isGridView by rememberSaveable { mutableStateOf(false) }
     var isFoldersMode by rememberSaveable { mutableStateOf(true) }
@@ -227,7 +228,7 @@ object HomeScreen : Screen {
 
     // Back button: navigate up one folder level!
     BackHandler(enabled = isFoldersMode && currentPath.isNotEmpty()) {
-      currentPath = currentPath.dropLast(1)
+      updatePath(currentPath.dropLast(1))
     }
 
     // Compute visible subfolders and direct videos for currentPath
@@ -294,7 +295,7 @@ object HomeScreen : Screen {
           },
           navigationIcon = {
             if (isFoldersMode && currentPath.isNotEmpty()) {
-              IconButton(onClick = { currentPath = currentPath.dropLast(1) }) {
+              IconButton(onClick = { updatePath(currentPath.dropLast(1)) }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
               }
             } else {
@@ -419,7 +420,7 @@ object HomeScreen : Screen {
             items(visibleSubFolders, key = { "drive_" + it.fullPathList.joinToString("/") }) { folder ->
               DriveCardItem(
                 folder = folder,
-                onClick = { currentPath = folder.fullPathList },
+                onClick = { updatePath(folder.fullPathList) },
               )
             }
           }
@@ -436,7 +437,7 @@ object HomeScreen : Screen {
             items(visibleSubFolders, key = { "folder_" + it.fullPathList.joinToString("/") }) { folder ->
               CompactFolderGridCard(
                 folder = folder,
-                onClick = { currentPath = folder.fullPathList },
+                onClick = { updatePath(folder.fullPathList) },
                 onLongClick = {
                   selectedFolderForAction = folder
                   selectedVideoForAction = null
@@ -468,7 +469,7 @@ object HomeScreen : Screen {
             items(visibleSubFolders, key = { "folder_" + it.fullPathList.joinToString("/") }) { folder ->
               FolderRowItem(
                 folder = folder,
-                onClick = { currentPath = folder.fullPathList },
+                onClick = { updatePath(folder.fullPathList) },
                 onLongClick = {
                   selectedFolderForAction = folder
                   selectedVideoForAction = null
