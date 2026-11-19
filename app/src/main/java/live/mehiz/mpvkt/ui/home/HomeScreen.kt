@@ -181,6 +181,7 @@ object HomeScreen : Screen {
     var selectedFolderForAction by remember { mutableStateOf<SubFolderInfo?>(null) }
     var isActionDialogOpen by remember { mutableStateOf(false) }
     var isDeleteDialogOpen by remember { mutableStateOf(false) }
+    var isPermissionDialogOpen by remember { mutableStateOf(false) }
     var clipboardPath by remember { mutableStateOf<String?>(null) }
     var clipboardIsFolder by remember { mutableStateOf(false) }
     var clipboardName by remember { mutableStateOf<String?>(null) }
@@ -207,6 +208,40 @@ object HomeScreen : Screen {
       }
     }
 
+    val storageSettingsLauncher = rememberLauncherForActivityResult(
+      contract = ActivityResultContracts.StartActivityForResult(),
+    ) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()) {
+        Toast.makeText(context, "Storage access granted", Toast.LENGTH_SHORT).show()
+        scanMedia()
+      }
+    }
+
+    val requestStoragePermission = {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        try {
+          val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+            data = Uri.parse("package:${context.packageName}")
+          }
+          storageSettingsLauncher.launch(intent)
+        } catch (_: Exception) {
+          try {
+            val intent = Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+            storageSettingsLauncher.launch(intent)
+          } catch (_: Exception) {
+            Toast.makeText(context, "Could not open system settings", Toast.LENGTH_SHORT).show()
+          }
+        }
+      } else {
+        permissionLauncher.launch(
+          arrayOf(
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+          ),
+        )
+      }
+    }
+
     LaunchedEffect(Unit) {
       val neededPermissions = mutableListOf<String>()
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -223,6 +258,11 @@ object HomeScreen : Screen {
         permissionLauncher.launch(neededPermissions.toTypedArray())
       } else {
         scanMedia()
+      }
+
+      // Check All Files Access on Android 11+ (API 30+)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+        isPermissionDialogOpen = true
       }
     }
 
@@ -312,25 +352,55 @@ object HomeScreen : Screen {
             if (clipboardPath != null) {
               IconButton(
                 onClick = {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+                    isPermissionDialogOpen = true
+                    return@IconButton
+                  }
+                  val clipPath = clipboardPath ?: return@IconButton
                   coroutineScope.launch(Dispatchers.IO) {
                     try {
-                      val src = File(clipboardPath!!)
-                      if (src.exists()) {
-                        val targetDir = resolveRealDirectory(currentPath)
-                        if (!targetDir.exists()) targetDir.mkdirs()
-                        val dest = File(targetDir, src.name)
-                        if (src.isDirectory) {
-                          src.copyRecursively(dest, overwrite = true)
-                        } else {
-                          src.copyTo(dest, overwrite = true)
-                        }
-                        MediaScannerConnection.scanFile(context, arrayOf(dest.absolutePath), null, null)
+                      val src = File(clipPath)
+                      if (!src.exists()) {
                         withContext(Dispatchers.Main) {
-                          Toast.makeText(context, "Pasted '${dest.name}' successfully", Toast.LENGTH_SHORT).show()
+                          Toast.makeText(context, "Source file no longer exists", Toast.LENGTH_SHORT).show()
                           clipboardPath = null
                           clipboardName = null
-                          scanMedia()
                         }
+                        return@launch
+                      }
+
+                      val targetDir = resolveRealDirectory(currentPath)
+                      if (!targetDir.exists()) targetDir.mkdirs()
+
+                      var dest = File(targetDir, src.name)
+                      if (dest.canonicalPath == src.canonicalPath) {
+                        val nameWithoutExt = src.nameWithoutExtension
+                        val ext = if (src.isFile && src.extension.isNotEmpty()) ".${src.extension}" else ""
+                        var counter = 1
+                        while (dest.exists()) {
+                          dest = File(targetDir, "${nameWithoutExt}_copy$counter$ext")
+                          counter++
+                        }
+                      }
+
+                      if (src.isDirectory) {
+                        if (dest.canonicalPath.startsWith(src.canonicalPath + File.separator)) {
+                          withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "Cannot paste folder into itself", Toast.LENGTH_SHORT).show()
+                          }
+                          return@launch
+                        }
+                        src.copyRecursively(dest, overwrite = true)
+                      } else {
+                        src.copyTo(dest, overwrite = true)
+                      }
+
+                      MediaScannerConnection.scanFile(context, arrayOf(dest.absolutePath), null, null)
+                      withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Pasted '${dest.name}' successfully", Toast.LENGTH_SHORT).show()
+                        clipboardPath = null
+                        clipboardName = null
+                        scanMedia()
                       }
                     } catch (e: Exception) {
                       e.printStackTrace()
@@ -516,7 +586,11 @@ object HomeScreen : Screen {
           },
           onDelete = {
             isActionDialogOpen = false
-            isDeleteDialogOpen = true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+              isPermissionDialogOpen = true
+            } else {
+              isDeleteDialogOpen = true
+            }
           },
           onDismissRequest = { isActionDialogOpen = false },
         )
@@ -529,66 +603,128 @@ object HomeScreen : Screen {
         DeleteConfirmDialog(
           title = itemName,
           onRecycleBin = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+              isDeleteDialogOpen = false
+              isPermissionDialogOpen = true
+              return@DeleteConfirmDialog
+            }
             coroutineScope.launch(Dispatchers.IO) {
+              var isSuccess = false
+              var errorMsg: String? = null
               try {
                 val src = File(itemPath)
                 if (src.exists()) {
-                  val trashDir = File(Environment.getExternalStorageDirectory(), ".bplayer_trash")
+                  val trashDir = if (src.absolutePath.startsWith("/storage/emulated/0") || src.absolutePath.startsWith("/sdcard")) {
+                    File(Environment.getExternalStorageDirectory(), ".bplayer_trash")
+                  } else {
+                    val rootDir = src.parentFile?.let { p ->
+                      var cur = p
+                      while (cur.parentFile != null && cur.parentFile!!.absolutePath != "/storage" && cur.parentFile!!.absolutePath != "/") {
+                        cur = cur.parentFile!!
+                      }
+                      cur
+                    } ?: Environment.getExternalStorageDirectory()
+                    File(rootDir, ".bplayer_trash")
+                  }
+
                   if (!trashDir.exists()) trashDir.mkdirs()
                   val noMedia = File(trashDir, ".nomedia")
                   if (!noMedia.exists()) noMedia.createNewFile()
 
                   val dest = File(trashDir, "${System.currentTimeMillis()}_${src.name}")
-                  val ok = src.renameTo(dest) || (src.copyTo(dest, overwrite = true).also { src.delete() }.exists())
-                  if (ok && selectedVideoForAction != null) {
-                    try {
-                      context.contentResolver.delete(selectedVideoForAction!!.uri, null, null)
-                    } catch (_: Exception) {}
+                  val ok = src.renameTo(dest) || (
+                    if (src.isDirectory) {
+                      src.copyRecursively(dest, overwrite = true).also { src.deleteRecursively() }
+                    } else {
+                      src.copyTo(dest, overwrite = true).also { src.delete() }.exists()
+                    }
+                  )
+                  if (ok) {
+                    isSuccess = true
+                    if (selectedVideoForAction != null) {
+                      try {
+                        context.contentResolver.delete(selectedVideoForAction!!.uri, null, null)
+                      } catch (_: Exception) {}
+                    }
+                    MediaScannerConnection.scanFile(context, arrayOf(src.absolutePath, dest.absolutePath), null, null)
+                  } else {
+                    errorMsg = "Failed to move file to Recycle Bin"
                   }
-                  MediaScannerConnection.scanFile(context, arrayOf(src.absolutePath, dest.absolutePath), null, null)
+                } else {
+                  errorMsg = "File does not exist"
                 }
               } catch (e: Exception) {
                 e.printStackTrace()
+                errorMsg = e.message
               }
               withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Moved to Recycle Bin", Toast.LENGTH_SHORT).show()
-                isDeleteDialogOpen = false
-                selectedVideoForAction = null
-                selectedFolderForAction = null
-                scanMedia()
+                if (isSuccess) {
+                  Toast.makeText(context, "Moved to Recycle Bin", Toast.LENGTH_SHORT).show()
+                  isDeleteDialogOpen = false
+                  selectedVideoForAction = null
+                  selectedFolderForAction = null
+                  scanMedia()
+                } else {
+                  Toast.makeText(context, "Delete failed: ${errorMsg ?: "Unknown error"}", Toast.LENGTH_SHORT).show()
+                }
               }
             }
           },
           onPermanentDelete = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+              isDeleteDialogOpen = false
+              isPermissionDialogOpen = true
+              return@DeleteConfirmDialog
+            }
             coroutineScope.launch(Dispatchers.IO) {
+              var isSuccess = false
+              var errorMsg: String? = null
               try {
                 val src = File(itemPath)
                 if (src.exists()) {
-                  if (src.isDirectory) {
-                    src.deleteRecursively()
+                  val deleted = if (src.isDirectory) src.deleteRecursively() else src.delete()
+                  if (deleted || !src.exists()) {
+                    isSuccess = true
+                    if (selectedVideoForAction != null) {
+                      try {
+                        context.contentResolver.delete(selectedVideoForAction!!.uri, null, null)
+                      } catch (_: Exception) {}
+                    }
+                    MediaScannerConnection.scanFile(context, arrayOf(src.absolutePath), null, null)
                   } else {
-                    src.delete()
+                    errorMsg = "Could not delete file"
                   }
+                } else {
+                  errorMsg = "File does not exist"
                 }
-                if (selectedVideoForAction != null) {
-                  try {
-                    context.contentResolver.delete(selectedVideoForAction!!.uri, null, null)
-                  } catch (_: Exception) {}
-                }
-                MediaScannerConnection.scanFile(context, arrayOf(src.absolutePath), null, null)
               } catch (e: Exception) {
                 e.printStackTrace()
+                errorMsg = e.message
               }
               withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Deleted permanently", Toast.LENGTH_SHORT).show()
-                isDeleteDialogOpen = false
-                selectedVideoForAction = null
-                selectedFolderForAction = null
-                scanMedia()
+                if (isSuccess) {
+                  Toast.makeText(context, "Deleted permanently", Toast.LENGTH_SHORT).show()
+                  isDeleteDialogOpen = false
+                  selectedVideoForAction = null
+                  selectedFolderForAction = null
+                  scanMedia()
+                } else {
+                  Toast.makeText(context, "Delete failed: ${errorMsg ?: "Unknown error"}", Toast.LENGTH_SHORT).show()
+                }
               }
             }
           },
           onDismissRequest = { isDeleteDialogOpen = false },
+        )
+      }
+
+      if (isPermissionDialogOpen) {
+        StoragePermissionDialog(
+          onGrantPermission = {
+            isPermissionDialogOpen = false
+            requestStoragePermission()
+          },
+          onDismissRequest = { isPermissionDialogOpen = false },
         )
       }
     }
@@ -1453,6 +1589,87 @@ fun DeleteConfirmDialog(
             modifier = Modifier.align(Alignment.End),
           ) {
             Text("Cancel", color = Color(0xFF8A99AD))
+          }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+fun StoragePermissionDialog(
+  onGrantPermission: () -> Unit,
+  onDismissRequest: () -> Unit,
+) {
+  Dialog(onDismissRequest = onDismissRequest) {
+    Card(
+      modifier = Modifier
+        .widthIn(min = 300.dp, max = 450.dp)
+        .padding(16.dp),
+      shape = RoundedCornerShape(16.dp),
+      colors = CardDefaults.cardColors(
+        containerColor = Color(0xEE0D1420),
+      ),
+      border = BorderStroke(1.dp, Color(0x6600E5FF)),
+    ) {
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(20.dp),
+      ) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+          Icon(
+            Icons.Default.Storage,
+            contentDescription = null,
+            tint = Color(0xFF00E5FF),
+            modifier = Modifier.size(26.dp),
+          )
+          Text(
+            text = "Storage Access Required",
+            fontWeight = FontWeight.Bold,
+            fontSize = 17.sp,
+            color = Color.White,
+          )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+          text = "To Copy, Paste, and Delete video files on Android 11+, B-Player requires 'All files access' permission.",
+          fontSize = 14.sp,
+          color = Color(0xFFECEFF1),
+          lineHeight = 20.sp,
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+          text = "Please tap 'Allow Access' and turn on the toggle for B-Player in system settings.",
+          fontSize = 12.sp,
+          color = Color(0xFF90A4AE),
+          lineHeight = 17.sp,
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Color(0x22FFFFFF))
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.End,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          TextButton(onClick = onDismissRequest) {
+            Text("Cancel", color = Color(0xFF8A99AD))
+          }
+          Spacer(modifier = Modifier.width(8.dp))
+          Button(
+            onClick = onGrantPermission,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
+            shape = RoundedCornerShape(8.dp),
+          ) {
+            Text("Allow Access", color = Color.Black, fontWeight = FontWeight.Bold)
           }
         }
       }
