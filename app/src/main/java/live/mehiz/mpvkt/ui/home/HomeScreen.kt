@@ -7,14 +7,20 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.StatFs
+import android.media.MediaScannerConnection
 import android.provider.MediaStore
 import android.util.Size
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +34,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -39,23 +46,37 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.RestoreFromTrash
+import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -64,6 +85,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,6 +96,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -142,10 +166,23 @@ object HomeScreen : Screen {
     val coroutineScope = rememberCoroutineScope()
 
     var allVideos by remember { mutableStateOf<List<VideoItem>>(emptyList()) }
-    var currentPath by remember { mutableStateOf<List<String>>(emptyList()) }
+    var currentPath by rememberSaveable(
+      saver = listSaver(
+        save = { it },
+        restore = { it },
+      ),
+    ) { mutableStateOf<List<String>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var isGridView by remember { mutableStateOf(false) }
-    var isFoldersMode by remember { mutableStateOf(true) }
+    var isGridView by rememberSaveable { mutableStateOf(false) }
+    var isFoldersMode by rememberSaveable { mutableStateOf(true) }
+
+    var selectedVideoForAction by remember { mutableStateOf<VideoItem?>(null) }
+    var selectedFolderForAction by remember { mutableStateOf<SubFolderInfo?>(null) }
+    var isActionDialogOpen by remember { mutableStateOf(false) }
+    var isDeleteDialogOpen by remember { mutableStateOf(false) }
+    var clipboardPath by remember { mutableStateOf<String?>(null) }
+    var clipboardIsFolder by remember { mutableStateOf(false) }
+    var clipboardName by remember { mutableStateOf<String?>(null) }
 
     fun scanMedia() {
       coroutineScope.launch {
@@ -271,6 +308,45 @@ object HomeScreen : Screen {
             }
           },
           actions = {
+            if (clipboardPath != null) {
+              IconButton(
+                onClick = {
+                  coroutineScope.launch(Dispatchers.IO) {
+                    try {
+                      val src = File(clipboardPath!!)
+                      if (src.exists()) {
+                        val targetDir = resolveRealDirectory(currentPath)
+                        if (!targetDir.exists()) targetDir.mkdirs()
+                        val dest = File(targetDir, src.name)
+                        if (src.isDirectory) {
+                          src.copyRecursively(dest, overwrite = true)
+                        } else {
+                          src.copyTo(dest, overwrite = true)
+                        }
+                        MediaScannerConnection.scanFile(context, arrayOf(dest.absolutePath), null, null)
+                        withContext(Dispatchers.Main) {
+                          Toast.makeText(context, "Pasted '${dest.name}' successfully", Toast.LENGTH_SHORT).show()
+                          clipboardPath = null
+                          clipboardName = null
+                          scanMedia()
+                        }
+                      }
+                    } catch (e: Exception) {
+                      e.printStackTrace()
+                      withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Paste failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                      }
+                    }
+                  }
+                },
+              ) {
+                Icon(
+                  Icons.Default.ContentPaste,
+                  contentDescription = "Paste here",
+                  tint = Color(0xFF00E5FF),
+                )
+              }
+            }
             IconButton(onClick = { isGridView = !isGridView }) {
               Icon(
                 if (isGridView) Icons.AutoMirrored.Filled.List else Icons.Default.GridView,
@@ -319,6 +395,34 @@ object HomeScreen : Screen {
               )
             }
           }
+        } else if (isFoldersMode && currentPath.isEmpty()) {
+          // PC-Style Storage Drives View ("This PC" style)
+          LazyColumn(
+            contentPadding = PaddingValues(vertical = 12.dp),
+            modifier = Modifier.fillMaxSize(),
+          ) {
+            item {
+              Row(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+              ) {
+                Text(
+                  text = "Devices and drives",
+                  fontWeight = FontWeight.Bold,
+                  fontSize = 13.sp,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+            }
+            items(visibleSubFolders, key = { "drive_" + it.fullPathList.joinToString("/") }) { folder ->
+              DriveCardItem(
+                folder = folder,
+                onClick = { currentPath = folder.fullPathList },
+              )
+            }
+          }
         } else if (isGridView) {
           // Compact Adaptive Grid: ~105dp tiles, looks compact like app launcher icons!
           LazyVerticalGrid(
@@ -333,6 +437,11 @@ object HomeScreen : Screen {
               CompactFolderGridCard(
                 folder = folder,
                 onClick = { currentPath = folder.fullPathList },
+                onLongClick = {
+                  selectedFolderForAction = folder
+                  selectedVideoForAction = null
+                  isActionDialogOpen = true
+                },
               )
             }
 
@@ -341,6 +450,11 @@ object HomeScreen : Screen {
               CompactVideoGridCard(
                 video = video,
                 onClick = { playVideo(context, video) },
+                onLongClick = {
+                  selectedVideoForAction = video
+                  selectedFolderForAction = null
+                  isActionDialogOpen = true
+                },
               )
             }
           }
@@ -355,6 +469,11 @@ object HomeScreen : Screen {
               FolderRowItem(
                 folder = folder,
                 onClick = { currentPath = folder.fullPathList },
+                onLongClick = {
+                  selectedFolderForAction = folder
+                  selectedVideoForAction = null
+                  isActionDialogOpen = true
+                },
               )
             }
 
@@ -363,10 +482,113 @@ object HomeScreen : Screen {
               VideoRowItem(
                 video = video,
                 onClick = { playVideo(context, video) },
+                onLongClick = {
+                  selectedVideoForAction = video
+                  selectedFolderForAction = null
+                  isActionDialogOpen = true
+                },
               )
             }
           }
         }
+      }
+
+      if (isActionDialogOpen) {
+        val itemName = selectedVideoForAction?.title ?: selectedFolderForAction?.name ?: ""
+        val isFolder = selectedFolderForAction != null
+        ItemActionDialog(
+          title = itemName,
+          isFolder = isFolder,
+          onCopy = {
+            if (selectedVideoForAction != null) {
+              clipboardPath = selectedVideoForAction!!.path
+              clipboardIsFolder = false
+              clipboardName = selectedVideoForAction!!.title
+            } else if (selectedFolderForAction != null) {
+              val targetDir = resolveRealDirectory(selectedFolderForAction!!.fullPathList)
+              clipboardPath = targetDir.absolutePath
+              clipboardIsFolder = true
+              clipboardName = selectedFolderForAction!!.name
+            }
+            Toast.makeText(context, "Copied: $clipboardName", Toast.LENGTH_SHORT).show()
+            isActionDialogOpen = false
+          },
+          onDelete = {
+            isActionDialogOpen = false
+            isDeleteDialogOpen = true
+          },
+          onDismissRequest = { isActionDialogOpen = false },
+        )
+      }
+
+      if (isDeleteDialogOpen) {
+        val itemName = selectedVideoForAction?.title ?: selectedFolderForAction?.name ?: ""
+        val itemPath = selectedVideoForAction?.path ?: resolveRealDirectory(selectedFolderForAction?.fullPathList ?: emptyList()).absolutePath
+
+        DeleteConfirmDialog(
+          title = itemName,
+          onRecycleBin = {
+            coroutineScope.launch(Dispatchers.IO) {
+              try {
+                val src = File(itemPath)
+                if (src.exists()) {
+                  val trashDir = File(Environment.getExternalStorageDirectory(), ".bplayer_trash")
+                  if (!trashDir.exists()) trashDir.mkdirs()
+                  val noMedia = File(trashDir, ".nomedia")
+                  if (!noMedia.exists()) noMedia.createNewFile()
+
+                  val dest = File(trashDir, "${System.currentTimeMillis()}_${src.name}")
+                  val ok = src.renameTo(dest) || (src.copyTo(dest, overwrite = true).also { src.delete() }.exists())
+                  if (ok && selectedVideoForAction != null) {
+                    try {
+                      context.contentResolver.delete(selectedVideoForAction!!.uri, null, null)
+                    } catch (_: Exception) {}
+                  }
+                  MediaScannerConnection.scanFile(context, arrayOf(src.absolutePath, dest.absolutePath), null, null)
+                }
+              } catch (e: Exception) {
+                e.printStackTrace()
+              }
+              withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Moved to Recycle Bin", Toast.LENGTH_SHORT).show()
+                isDeleteDialogOpen = false
+                selectedVideoForAction = null
+                selectedFolderForAction = null
+                scanMedia()
+              }
+            }
+          },
+          onPermanentDelete = {
+            coroutineScope.launch(Dispatchers.IO) {
+              try {
+                val src = File(itemPath)
+                if (src.exists()) {
+                  if (src.isDirectory) {
+                    src.deleteRecursively()
+                  } else {
+                    src.delete()
+                  }
+                }
+                if (selectedVideoForAction != null) {
+                  try {
+                    context.contentResolver.delete(selectedVideoForAction!!.uri, null, null)
+                  } catch (_: Exception) {}
+                }
+                MediaScannerConnection.scanFile(context, arrayOf(src.absolutePath), null, null)
+              } catch (e: Exception) {
+                e.printStackTrace()
+              }
+              withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Deleted permanently", Toast.LENGTH_SHORT).show()
+                isDeleteDialogOpen = false
+                selectedVideoForAction = null
+                selectedFolderForAction = null
+                scanMedia()
+              }
+            }
+          },
+          onDismissRequest = { isDeleteDialogOpen = false },
+        )
       }
     }
   }
@@ -523,6 +745,26 @@ object HomeScreen : Screen {
     return list
   }
 
+  private fun resolveRealDirectory(pathSegments: List<String>): File {
+    if (pathSegments.isEmpty()) return Environment.getExternalStorageDirectory()
+    val root = pathSegments.first()
+    val subSegments = pathSegments.drop(1)
+    val baseDir = if (root == "Internal Storage") {
+      Environment.getExternalStorageDirectory()
+    } else {
+      val storage = File("/storage")
+      val sdRoot = storage.listFiles()?.firstOrNull {
+        it.isDirectory && it.canRead() && !it.name.equals("emulated", true) && !it.name.equals("self", true)
+      } ?: Environment.getExternalStorageDirectory()
+      sdRoot
+    }
+    var target = baseDir
+    for (seg in subSegments) {
+      target = File(target, seg)
+    }
+    return target
+  }
+
   private fun getRelativeDirSegments(filePath: String): List<String> {
     val file = File(filePath)
     val parent = file.parentFile ?: return emptyList()
@@ -555,15 +797,17 @@ object HomeScreen : Screen {
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FolderRowItem(
   folder: SubFolderInfo,
   onClick: () -> Unit,
+  onLongClick: () -> Unit = {},
 ) {
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .clickable(onClick = onClick)
+      .combinedClickable(onClick = onClick, onLongClick = onLongClick)
       .padding(horizontal = 20.dp, vertical = 12.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -628,16 +872,18 @@ fun FolderRowItem(
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CompactFolderGridCard(
   folder: SubFolderInfo,
   onClick: () -> Unit,
+  onLongClick: () -> Unit = {},
 ) {
   Card(
     modifier = Modifier
       .fillMaxWidth()
       .height(98.dp)
-      .clickable(onClick = onClick),
+      .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     shape = RoundedCornerShape(12.dp),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
@@ -716,16 +962,18 @@ fun rememberVideoThumbnail(uri: Uri, width: Int, height: Int): ImageBitmap? {
   return bitmap
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun VideoRowItem(
   video: VideoItem,
   onClick: () -> Unit,
+  onLongClick: () -> Unit = {},
 ) {
   val thumbnail = rememberVideoThumbnail(video.uri, 180, 110)
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .clickable(onClick = onClick)
+      .combinedClickable(onClick = onClick, onLongClick = onLongClick)
       .padding(horizontal = 20.dp, vertical = 8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -804,17 +1052,19 @@ fun VideoRowItem(
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CompactVideoGridCard(
   video: VideoItem,
   onClick: () -> Unit,
+  onLongClick: () -> Unit = {},
 ) {
   val thumbnail = rememberVideoThumbnail(video.uri, 280, 160)
   Card(
     modifier = Modifier
       .fillMaxWidth()
       .height(130.dp)
-      .clickable(onClick = onClick),
+      .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     shape = RoundedCornerShape(10.dp),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -884,6 +1134,325 @@ fun CompactVideoGridCard(
             fontSize = 9.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
+        }
+      }
+    }
+  }
+}
+
+@Composable
+fun DriveCardItem(
+  folder: SubFolderInfo,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  val isSdCard = folder.name.equals("SD Card", ignoreCase = true)
+  val driveLetter = if (isSdCard) "D:" else "C:"
+  val driveLabel = if (isSdCard) "SD Card ($driveLetter)" else "Internal Storage ($driveLetter)"
+  val driveTint = if (isSdCard) Color(0xFF00E676) else Color(0xFF00E5FF)
+  val borderColor = if (isSdCard) Color(0x5500E676) else Color(0x5500E5FF)
+
+  val (storageText, progress) = remember(folder.name) {
+    try {
+      val path = if (!isSdCard) {
+        Environment.getDataDirectory().path
+      } else {
+        val storage = File("/storage")
+        val sd = storage.listFiles()?.firstOrNull {
+          it.isDirectory && it.canRead() && !it.name.equals("emulated", true) && !it.name.equals("self", true)
+        }
+        sd?.path ?: Environment.getExternalStorageDirectory().path
+      }
+      val stat = StatFs(path)
+      val totalBytes = stat.totalBytes
+      val freeBytes = stat.availableBytes
+      val usedBytes = totalBytes - freeBytes
+      val prog = if (totalBytes > 0) (usedBytes.toDouble() / totalBytes.toDouble()).toFloat() else 0.5f
+      val freeGb = freeBytes / (1024.0 * 1024.0 * 1024.0)
+      val totalGb = totalBytes / (1024.0 * 1024.0 * 1024.0)
+      Pair(String.format(Locale.US, "%.1f GB free of %.1f GB", freeGb, totalGb), prog.coerceIn(0f, 1f))
+    } catch (_: Exception) {
+      Pair("${folder.videoCount} videos", 0.5f)
+    }
+  }
+
+  Card(
+    modifier = modifier
+      .fillMaxWidth()
+      .padding(horizontal = 16.dp, vertical = 8.dp)
+      .clickable(onClick = onClick),
+    shape = RoundedCornerShape(16.dp),
+    colors = CardDefaults.cardColors(
+      containerColor = Color(0xDD0D1420),
+    ),
+    border = BorderStroke(1.5.dp, borderColor),
+  ) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(16.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Box(
+        modifier = Modifier
+          .size(52.dp)
+          .clip(RoundedCornerShape(12.dp))
+          .background(driveTint.copy(alpha = 0.15f)),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(
+          if (isSdCard) Icons.Default.SdStorage else Icons.Default.Storage,
+          contentDescription = null,
+          modifier = Modifier.size(32.dp),
+          tint = driveTint,
+        )
+      }
+
+      Spacer(modifier = Modifier.width(16.dp))
+
+      Column(modifier = Modifier.weight(1f)) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text(
+            text = driveLabel,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            color = Color.White,
+          )
+          Text(
+            text = "${folder.videoCount} videos",
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+            color = driveTint,
+          )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        LinearProgressIndicator(
+          progress = { progress },
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(7.dp)
+            .clip(RoundedCornerShape(4.dp)),
+          color = driveTint,
+          trackColor = Color(0x33FFFFFF),
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        if (storageText.isNotBlank()) {
+          Text(
+            text = storageText,
+            fontSize = 11.sp,
+            color = Color(0xFF8A99AD),
+          )
+        }
+      }
+
+      Spacer(modifier = Modifier.width(12.dp))
+
+      Icon(
+        Icons.Default.ChevronRight,
+        contentDescription = null,
+        tint = Color(0xFF8A99AD),
+        modifier = Modifier.size(24.dp),
+      )
+    }
+  }
+}
+
+@Composable
+fun ItemActionDialog(
+  title: String,
+  isFolder: Boolean,
+  onCopy: () -> Unit,
+  onDelete: () -> Unit,
+  onDismissRequest: () -> Unit,
+) {
+  Dialog(onDismissRequest = onDismissRequest) {
+    Card(
+      modifier = Modifier
+        .widthIn(min = 280.dp, max = 400.dp)
+        .padding(16.dp),
+      shape = RoundedCornerShape(16.dp),
+      colors = CardDefaults.cardColors(
+        containerColor = Color(0xDD0D1420),
+      ),
+      border = BorderStroke(1.dp, Color(0x3300E5FF)),
+    ) {
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(16.dp),
+      ) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            Icon(
+              if (isFolder) Icons.Default.Folder else Icons.Default.Movie,
+              contentDescription = null,
+              tint = Color(0xFF00E5FF),
+              modifier = Modifier.size(22.dp),
+            )
+            Text(
+              text = title,
+              color = Color.White,
+              fontWeight = FontWeight.Bold,
+              fontSize = 15.sp,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+            )
+          }
+          IconButton(onClick = onDismissRequest, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFF8A99AD), modifier = Modifier.size(20.dp))
+          }
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0x22FFFFFF))
+
+        // Copy option
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onCopy)
+            .padding(vertical = 10.dp, horizontal = 8.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          Icon(Icons.Default.ContentCopy, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(20.dp))
+          Text("Copy", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+
+        // Delete option
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onDelete)
+            .padding(vertical = 10.dp, horizontal = 8.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF5252), modifier = Modifier.size(20.dp))
+          Text("Delete", color = Color(0xFFFF5252), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+      }
+    }
+  }
+}
+
+@Composable
+fun DeleteConfirmDialog(
+  title: String,
+  onRecycleBin: () -> Unit,
+  onPermanentDelete: () -> Unit,
+  onDismissRequest: () -> Unit,
+) {
+  Dialog(onDismissRequest = onDismissRequest) {
+    Card(
+      modifier = Modifier
+        .widthIn(min = 300.dp, max = 450.dp)
+        .padding(16.dp),
+      shape = RoundedCornerShape(16.dp),
+      colors = CardDefaults.cardColors(
+        containerColor = Color(0xDD0D1420),
+      ),
+      border = BorderStroke(1.dp, Color(0x3300E5FF)),
+    ) {
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(18.dp),
+      ) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+          Icon(Icons.Default.DeleteForever, contentDescription = null, tint = Color(0xFFFF5252), modifier = Modifier.size(24.dp))
+          Text(
+            text = "Delete",
+            fontWeight = FontWeight.Bold,
+            fontSize = 17.sp,
+            color = Color.White,
+          )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+          text = "\"$title\"",
+          fontWeight = FontWeight.SemiBold,
+          fontSize = 14.sp,
+          color = Color(0xFF00E5FF),
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis,
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+          text = "Do you want to move this file to the Recycle Bin or delete it permanently?",
+          fontSize = 13.sp,
+          color = Color(0xFFB0BEC5),
+          lineHeight = 18.sp,
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = Color(0x22FFFFFF))
+
+        // Options
+        Column(
+          modifier = Modifier.fillMaxWidth(),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          // Recycle Bin
+          Button(
+            onClick = onRecycleBin,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+              containerColor = Color(0x3300E5FF),
+            ),
+            border = BorderStroke(1.dp, Color(0xFF00E5FF)),
+            shape = RoundedCornerShape(10.dp),
+          ) {
+            Icon(Icons.Default.RestoreFromTrash, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Move to Recycle Bin", color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
+          }
+
+          // Permanent Delete
+          Button(
+            onClick = onPermanentDelete,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+              containerColor = Color(0x33FF5252),
+            ),
+            border = BorderStroke(1.dp, Color(0xFFFF5252)),
+            shape = RoundedCornerShape(10.dp),
+          ) {
+            Icon(Icons.Default.DeleteForever, contentDescription = null, tint = Color(0xFFFF5252), modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Delete Permanently", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
+          }
+
+          // Cancel
+          TextButton(
+            onClick = onDismissRequest,
+            modifier = Modifier.align(Alignment.End),
+          ) {
+            Text("Cancel", color = Color(0xFF8A99AD))
+          }
         }
       }
     }

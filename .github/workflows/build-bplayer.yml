@@ -36,31 +36,30 @@ jobs:
         run: |
           mkdir -p release-apks
           # Package the single best 64-bit APK for Android 10+ devices
-          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.2.2.apk
+          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk release-apks/B-Player-v1.2.3.apk
           ls -la release-apks/
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: B-Player-v1.2.2-APK
+          name: B-Player-v1.2.3-APK
           path: release-apks/
           retention-days: 30
 
-      - name: Create GitHub Release v1.2.2
+      - name: Create GitHub Release v1.2.3
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.2
-          name: "B-Player v1.2.2 (MX-Style Audio Track Dialog with Radio Buttons, SW Audio Decoder & Open Browser)"
+          tag_name: v1.2.3
+          name: "B-Player v1.2.3 (Rotation Persistence, PC-Style Drives & File Management: Copy, Paste, Recycle Bin Delete)"
           body: |
-            ## 👑 B-Player v1.2.2 - Ultimate MX-Style Audio Experience
+            ## 👑 B-Player v1.2.3 - Rotation Fix, PC Drives & File Operations Edition
             
-            ### 🌟 What's New in v1.2.2:
-            * 🎵 **MX-Style Audio Track Dialog**: Centered translucent frosted glass popup window (`#DD0D1420`) with glowing cyan border (`#3300E5FF`).
-            * 🔘 **Clean Audio Radio Buttons**: Neatly lists all movie audio tracks with radio buttons (e.g., `◉ Audio Track #1 - English (5.1)`, `○ Audio Track #2 - Tamil (Stereo)`).
-            * 🚫 **Disable Option**: Quick radio button to mute/disable audio track when needed.
-            * ⚙️ **Use SW Audio Decoder**: Integrated checkbox to easily switch and force software libavcodec audio decoding.
-            * 📂 **In-Player Audio File Browser**: Bottom "Open" button opens a frosted-glass audio file browser directly in the movie folder to pick external audio tracks (.mp3, .m4a, .aac, .ac3, .dts, .flac, .opus, etc.) and auto-select instantly.
-          files: release-apks/B-Player-v1.2.2.apk
+            ### 🌟 What's New in v1.2.3:
+            * 🔄 **Screen Rotation State Persistence**: Rotating the phone (portrait to landscape or vice versa) will never reset your folder path back to root!
+            * 💽 **PC-Style Storage Drives ("This PC" Experience)**: At root Storage view, Internal Storage and SD Card / Chip are rendered as PC drives with disk icons, real storage space meters (free/total GB), and cyber cyan / emerald accents. Inside drives, contents are organized as standard folders!
+            * 📋 **Long-Press File Actions (Copy & Paste)**: Long press any video or folder to Copy, and tap the glowing Cyan "Paste here" button in the top bar to paste into any folder!
+            * 🗑️ **Dual Deletion (Recycle Bin vs Permanent Delete)**: Long press Delete presents two choices: "Move to Recycle Bin" (safe recovery) or "Delete Permanently", with instant media rescanning!
+          files: release-apks/B-Player-v1.2.3.apk
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
